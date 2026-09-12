@@ -1,0 +1,3 @@
+{
+  "expo":{"name":"Herlo","slug":"herlo","version":"0.1.0","orientation":"portrait","scheme":"herlo","userInterfaceStyle":"automatic","plugins":["expo-router","expo-location"],"android":{"package":"com.herlo.app"},"ios":{"bundleIdentifier":"com.herlo.app"}}
+}
