@@ -1,0 +1,6 @@
+{
+  "name":"herlo-platform",
+  "private":true,
+  "workspaces":["app","backend"],
+  "scripts":{"typecheck":"npm run typecheck --workspace app && npm run build --workspace backend","start":"npm run start --workspace app","api":"npm run dev --workspace backend"}
+}
