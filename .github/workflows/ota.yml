@@ -22,7 +22,8 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-  run: npm ci --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
       - name: Publish OTA
         run: npx eas-cli@latest update --channel preview --message "Girlies OTA update"
         env:
