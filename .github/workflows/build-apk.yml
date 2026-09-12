@@ -19,7 +19,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-  run: npm ci --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Build APK
         run: npx eas-cli@latest build --platform android --profile preview --non-interactive
