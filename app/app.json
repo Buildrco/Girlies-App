@@ -1,19 +1,26 @@
 {
   "expo": {
     "name": "Girlies",
-    "slug": "girlies",
-    "version": "1.0.0",
+    "slug": "herlo",
+    "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "girlies",
     "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-location"
+    ],
+    "android": {
+      "package": "com.girlies.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.girlies.app"
+    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/a7fa9be0-c509-4086-9421-47e3df9c5dfa"
-    },
-    "android": {
-      "package": "com.girlies.app"
     },
     "extra": {
       "eas": {
