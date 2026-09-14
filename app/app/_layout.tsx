@@ -23,7 +23,6 @@ export default function Layout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          detachInactiveScreens: false,
           freezeOnBlur: false,
         }}
       >
