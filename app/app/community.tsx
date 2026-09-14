@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, FlatList, Image, InteractionManager, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -76,7 +76,12 @@ export default function Community() {
     finally { loadingRef.current=false; if (mountedRef.current) { setLoading(false); setRefreshing(false); } }
   },[withTimeout]);
 
-  useFocusEffect(useCallback(() => { mountedRef.current=true; focusedRef.current=true; load(); return () => { focusedRef.current=false; mountedRef.current=false; }; }, [load]));
+  useFocusEffect(useCallback(() => {
+    mountedRef.current=true;
+    focusedRef.current=true;
+    const task=InteractionManager.runAfterInteractions(()=>{ if (focusedRef.current) load(); });
+    return () => { task.cancel(); focusedRef.current=false; mountedRef.current=false; };
+  }, [load]));
   useEffect(()=> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const scheduleLoad=()=>{ if (!focusedRef.current) return; if (timer) clearTimeout(timer); timer=setTimeout(load,350); };
