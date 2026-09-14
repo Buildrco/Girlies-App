@@ -2,7 +2,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kmfkafncpwmjnraumiwq.supabase.co';
 const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export const supabase = url && publishableKey ? createClient(url, publishableKey, {
@@ -10,6 +10,6 @@ export const supabase = url && publishableKey ? createClient(url, publishableKey
 }) : null;
 
 export function requireSupabase() {
-  if (!supabase) throw new Error('Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.');
+  if (!supabase) throw new Error('Supabase is not configured. Add EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the Expo environment.');
   return supabase;
 }
