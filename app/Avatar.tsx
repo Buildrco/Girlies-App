@@ -10,9 +10,7 @@ export function VerifiedMark({ size = 18 }: { size?: number }) {
 }
 
 export function Avatar({ size = 48, index = 0, verified = false }: { size?: number; index?: number; verified?: boolean }) {
-  const badgeSize = Math.max(16, size * 0.32);
   return <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'visible' }}>
     <Image source={{ uri: pics[index % pics.length] }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-    {verified && <View style={{ position: 'absolute', right: -4, bottom: -4, width: badgeSize + 4, height: badgeSize + 4, borderRadius: 20, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}><VerifiedMark size={badgeSize} /></View>}
   </View>;
 }

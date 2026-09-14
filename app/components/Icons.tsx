@@ -1,8 +1,31 @@
 import React from 'react';
-import { Text } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const glyphs: Record<string, string> = { chat:'◌', search:'⌕', bell:'♢', plus:'＋', send:'➤', bag:'▢', heart:'♡', more:'•••', back:'‹', share:'↗', settings:'⚙', spark:'✦', check:'✓', camera:'◉', mic:'●', location:'⌖', filter:'≡', arrow:'→', lock:'⌑', gift:'♧', chart:'⌁', shield:'◇' };
+const icons: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled?: keyof typeof Ionicons.glyphMap }> = {
+  chat: { outline: 'chatbubble-ellipses-outline', filled: 'chatbubble-ellipses' },
+  search: { outline: 'search-outline' },
+  bell: { outline: 'notifications-outline', filled: 'notifications' },
+  plus: { outline: 'add' },
+  send: { outline: 'paper-plane-outline', filled: 'paper-plane' },
+  bag: { outline: 'bag-outline', filled: 'bag' },
+  heart: { outline: 'heart-outline', filled: 'heart' },
+  more: { outline: 'ellipsis-horizontal' },
+  bookmark: { outline: 'bookmark-outline', filled: 'bookmark' },
+  back: { outline: 'chevron-back' },
+  share: { outline: 'paper-plane-outline' },
+  settings: { outline: 'settings-outline' },
+  spark: { outline: 'sparkles' },
+  check: { outline: 'checkmark' },
+  camera: { outline: 'camera-outline', filled: 'camera' },
+  mic: { outline: 'mic-outline', filled: 'mic' },
+  location: { outline: 'location-outline', filled: 'location' },
+  filter: { outline: 'options-outline' },
+  arrow: { outline: 'arrow-forward' },
+  lock: { outline: 'lock-closed-outline', filled: 'lock-closed' },
+  gift: { outline: 'gift-outline', filled: 'gift' },
+  chart: { outline: 'stats-chart-outline', filled: 'stats-chart' },
+  shield: { outline: 'shield-checkmark-outline', filled: 'shield-checkmark' },
+};
 const navIcons: Record<string, { outline: string; filled: string }> = {
   home: { outline: 'home-outline', filled: 'home' },
   shop: { outline: 'storefront-outline', filled: 'storefront' },
@@ -13,5 +36,6 @@ const navIcons: Record<string, { outline: string; filled: string }> = {
 export function I({ name, size = 23, color = '#171318', filled = false }: { name: string; size?: number; color?: string; filled?: boolean }) {
   if (navIcons[name]) return <Ionicons name={(filled ? navIcons[name].filled : navIcons[name].outline) as any} size={size} color={color} />;
   if (name === 'verified') return <MaterialCommunityIcons name="check-decagram" size={size} color={color} />;
-  return <Text style={{ fontSize: size, color, fontWeight: '700' }}>{glyphs[name] || '•'}</Text>;
+  const icon = icons[name] || icons.spark;
+  return <Ionicons name={(filled && icon.filled ? icon.filled : icon.outline) as any} size={size} color={color} />;
 }
