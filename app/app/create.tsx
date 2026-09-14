@@ -24,12 +24,13 @@ export default function Create() {
       allowsMultipleSelection: !video,
       quality: 0.9,
       videoMaxDuration: 120,
-    } as any);
+    });
     if (result.canceled) return;
-    const selected = result.assets.map((a: any) => ({
+    const selected: MediaItem[] = result.assets.map((a: ImagePicker.ImagePickerAsset) => ({
       uri: a.uri,
       type: (a.type === 'video' ? 'video' : 'image') as 'image' | 'video',
       name: a.fileName || undefined,
+      mimeType: a.mimeType || undefined,
     }));
     setMedia(current => [...current, ...selected].slice(0, 10));
   }
