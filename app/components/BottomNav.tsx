@@ -106,7 +106,7 @@ export function BottomNav() {
 
   const goToTab = (label: string, path: string, index: number) => {
     if (index === activeIndex) return;
-    router.replace({ pathname: path as any, params: { tabDirection: index > activeIndex ? '1' : '-1' } } as any);
+    router.navigate({ pathname: path as any, params: { tabDirection: index > activeIndex ? '1' : '-1' } } as any);
   };
 
   if (!activeItem) return null;
