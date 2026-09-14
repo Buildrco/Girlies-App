@@ -77,7 +77,7 @@ export default function Create() {
       <View style={s.tools}>
         <Pressable onPress={() => pickMedia(false)} style={s.tool}><I name="camera" size={23} color={C.pink}/><Text>Photo</Text></Pressable>
         <Pressable onPress={() => pickMedia(true)} style={s.tool}><I name="camera" size={23} color={C.pink}/><Text>Video</Text></Pressable>
-        <Pressable style={s.tool} onPress={() => setText(t => `${t}${t ? ' ' : ''}#`}><Text style={s.hash}>#</Text><Text>Hashtag</Text></Pressable>
+        <Pressable style={s.tool} onPress={() => setText(t => `${t}${t ? ' ' : ''}#`)}><Text style={s.hash}>#</Text><Text>Hashtag</Text></Pressable>
         <Pressable style={s.tool} onPress={() => setText(t => `${t}${t ? ' ' : ''}@`)}><Text style={s.at}>@</Text><Text>Mention</Text></Pressable>
       </View>
     </SafeAreaView>
