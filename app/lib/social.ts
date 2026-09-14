@@ -187,6 +187,43 @@ export async function setPostLike(postId: string, shouldLike: boolean) {
   return verified;
 }
 
+export async function getPostLikeState(postId: string) {
+  const me = await getSessionUser();
+  if (!me) return false;
+  const { data, error } = await supabase.from('post_likes')
+    .select('post_id').eq('post_id', postId).eq('user_id', me.id).maybeSingle();
+  if (error) throw new Error(`Like status failed: ${errorMessage(error, 'could not load the like status')}`);
+  return Boolean(data);
+}
+
+export async function getProductLikeState(productId: string) {
+  const me = await getSessionUser();
+  if (!me) return false;
+  const { data, error } = await supabase.from('product_likes')
+    .select('product_id').eq('product_id', productId).eq('user_id', me.id).maybeSingle();
+  if (error) throw new Error(`Like status failed: ${errorMessage(error, 'could not load the like status')}`);
+  return Boolean(data);
+}
+
+export async function setProductLike(productId: string, shouldLike: boolean) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to like products.');
+  if (shouldLike) {
+    const { error } = await supabase.from('product_likes').upsert(
+      { product_id: productId, user_id: me.id },
+      { onConflict: 'product_id,user_id' },
+    );
+    if (error) throw new Error(`Like failed: ${errorMessage(error, 'Supabase rejected the like')}`);
+  } else {
+    const { error } = await supabase.from('product_likes').delete()
+      .eq('product_id', productId).eq('user_id', me.id);
+    if (error) throw new Error(`Unlike failed: ${errorMessage(error, 'Supabase rejected the unlike')}`);
+  }
+  const verified = await getProductLikeState(productId);
+  if (verified !== shouldLike) throw new Error('The like change could not be verified. Please try again.');
+  return verified;
+}
+
 export async function setBookmark(postId: string, shouldBookmark: boolean) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in.');
