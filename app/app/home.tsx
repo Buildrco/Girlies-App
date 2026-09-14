@@ -8,9 +8,8 @@ import { Avatar, VerifiedMark } from '../Avatar';
 import { CurvedBanner } from '../components/CurvedBanner';
 import { ProductCard } from '../components/ProductCard';
 import { SectionTitle } from '../components/SectionTitle';
-import { BottomNav, useChromeVisibility } from '../components/BottomNav';
+import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
-import { TabMotion } from '../components/TabMotion';
 
 const imgs = [
   'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1000&q=85',
@@ -22,12 +21,12 @@ const imgs = [
 
 export default function Home() {
   const router = useRouter();
-  const { visibility, onScroll } = useChromeVisibility();
+  const { onScroll } = useChromeVisibility();
   const [hero, setHero] = useState(0);
   const [followed, setFollowed] = useState<number[]>([]);
   const [liked, setLiked] = useState(false);
   const sellers = ['Nia Hair', 'Amara Beauty', 'Glow Room', 'The Bag Edit', 'Scent Lab'];
-  return <TabMotion><SafeAreaView style={s.safe}>
+  return <SafeAreaView style={s.safe}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} /></Pressable></View></View>
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
@@ -43,8 +42,7 @@ export default function Home() {
       <View style={s.mini}><Text style={s.miniTitle}>Delivered without the stress.</Text><Text style={s.miniText}>Pay once. We calculate delivery and keep you updated.</Text><Pressable onPress={() => router.push('/orders')}><Text style={s.miniLink}>Track an order →</Text></Pressable></View>
       <View style={{ marginTop: 18 }}><SectionTitle title="Your spaces" /><View style={{ flexDirection: 'row', gap: 8 }}><Pressable onPress={() => router.push('/live')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.plum }}><Text style={{ fontSize: 10, fontWeight: '900', color: C.sun }}>LIVE NOW</Text><Text style={{ fontSize: 16, fontWeight: '900', color: '#FFF', marginTop: 5 }}>Watch girls live</Text><Text style={{ fontSize: 10, color: '#EADDE4', marginTop: 4 }}>Join the room →</Text></Pressable><Pressable onPress={() => router.push('/seller-onboarding')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.rose }}><Text style={{ fontSize: 10, fontWeight: '900' }}>SELL WITH US</Text><Text style={{ fontSize: 16, fontWeight: '900', marginTop: 5 }}>Open your shop</Text><Text style={{ fontSize: 10, marginTop: 4, fontWeight: '800' }}>Start here →</Text></Pressable></View></View>
     </Animated.ScrollView>
-    <BottomNav active="Home" visibility={visibility} />
-  </SafeAreaView></TabMotion>;
+  </SafeAreaView>;
 }
 
 const s = StyleSheet.create({

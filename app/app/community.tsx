@@ -5,9 +5,8 @@ import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { Avatar, VerifiedMark } from '../Avatar';
-import { BottomNav, useChromeVisibility } from '../components/BottomNav';
+import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
-import { TabMotion } from '../components/TabMotion';
 
 const pics = [
   'https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=85',
@@ -28,7 +27,7 @@ export default function Community() {
   const [liked, setLiked] = useState<number[]>([]);
   const toggleLike = (index: number) => setLiked(current => current.includes(index) ? current.filter(item => item !== index) : [...current, index]);
   const tabs = ['For you', 'Following', 'Trending', 'Hair girls'];
-  return <TabMotion><SafeAreaView style={s.safe}>
+  return <SafeAreaView style={s.safe}>
     <Animated.ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.top}>
         <Pressable onPress={() => router.push('/notifications')} style={s.iconButton}><I name="bell" size={25} /><View style={s.badge}><Text style={s.badgeText}>4</Text></View></Pressable>
@@ -61,8 +60,7 @@ export default function Community() {
       </View>)}
     </Animated.ScrollView>
     <Pressable style={[s.fab, { transform: [{ translateY: visibility.interpolate({ inputRange: [0, 1], outputRange: [90, 0] }) }] }]} onPress={() => router.push('/create')}><I name="plus" size={28} color="#FFF" /></Pressable>
-    <BottomNav active="Feed" visibility={visibility} />
-  </SafeAreaView></TabMotion>;
+  </SafeAreaView>;
 }
 
 const s = StyleSheet.create({

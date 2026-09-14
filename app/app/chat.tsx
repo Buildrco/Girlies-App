@@ -5,7 +5,6 @@ import{useRouter}from'expo-router';
 import{C}from'../constants/theme';
 import{Avatar}from'../Avatar';
 import{I}from'../components/Icons';
-import{BottomNav}from'../components/BottomNav';
 
 export default function Chat(){
   const r=useRouter();
@@ -79,7 +78,6 @@ export default function Chat(){
       <Text style={{fontSize:28,color:'#FFF'}}>＋</Text>
     </Pressable>
 
-    <BottomNav active=""/>
   </SafeAreaView>
 }
 
