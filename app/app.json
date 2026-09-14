@@ -8,7 +8,15 @@
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
-      "expo-location"
+      "expo-location",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Girlies needs access to your photos and videos so you can share them with the community.",
+          "cameraPermission": "Girlies needs camera access so you can take photos and videos to share.",
+          "microphonePermission": "Girlies needs microphone access when you record videos."
+        }
+      ]
     ],
     "android": {
       "package": "com.girlies.app"
