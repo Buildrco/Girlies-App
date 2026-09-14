@@ -8,11 +8,12 @@ import { Avatar, VerifiedMark } from '../Avatar';
 import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { supabase } from '../lib/supabase';
-import { addComment, getSessionUser, toggleFollow, togglePostLike, toggleBookmark } from '../lib/social';
+import { addComment, addShare, getSessionUser, setBookmark, setFollow, setPostLike } from '../lib/social';
 
 type Post = {
   id:string; author_id:string; body:string; media_urls:string[]; visibility:string; repost_of:string|null; created_at:string;
   profile?: {display_name:string;handle:string;avatar_url:string|null;verified:boolean};
+  like_count?: number;
 };
 
 type Story = {id:string;user_id:string;media_url:string;media_type:'image'|'video';caption:string;created_at:string;expires_at:string;profile?:{display_name:string;avatar_url:string|null}};
@@ -26,6 +27,7 @@ export default function Community() {
   const [liked,setLiked]=useState<Set<string>>(new Set());
   const [bookmarked,setBookmarked]=useState<Set<string>>(new Set());
   const [following,setFollowing]=useState<Set<string>>(new Set());
+  const [likeCounts,setLikeCounts]=useState<Record<string,number>>({});
   const [commenting,setCommenting]=useState<string|null>(null);
   const [comment,setComment]=useState('');
   const [refreshing,setRefreshing]=useState(false);
@@ -34,6 +36,15 @@ export default function Community() {
   const loadingRef=useRef(false);
   const mountedRef=useRef(true);
   const focusedRef=useRef(false);
+  const focusIdRef=useRef(0);
+  const loadRequestRef=useRef(0);
+  const likedRef=useRef(new Set<string>());
+  const bookmarkedRef=useRef(new Set<string>());
+  const followingRef=useRef(new Set<string>());
+  const likeDesiredRef=useRef(new Map<string,boolean>());
+  const followDesiredRef=useRef(new Map<string,boolean>());
+  const bookmarkDesiredRef=useRef(new Map<string,boolean>());
+  const mutationQueuesRef=useRef(new Map<string,Promise<void>>());
 
   const withTimeout = useCallback(<T,>(promise: Promise<T>, ms=8000) => new Promise<T>((resolve,reject) => {
     const timer=setTimeout(()=>reject(new Error('Feed request timed out. Check your connection and try again.')),ms);
@@ -43,6 +54,9 @@ export default function Community() {
   const load = useCallback(async () => {
     if (loadingRef.current || !focusedRef.current) return;
     loadingRef.current=true;
+    const requestId=++loadRequestRef.current;
+    const focusId=focusIdRef.current;
+    const isCurrent=()=>mountedRef.current&&focusedRef.current&&focusIdRef.current===focusId;
     try {
       setError('');
       const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await withTimeout(Promise.all([
@@ -54,33 +68,79 @@ export default function Community() {
       const authorIds=[...new Set((rows||[]).map((p:any)=>p.author_id))];
       const storyUsers=[...new Set((storyRows||[]).map((x:any)=>x.user_id))];
       const ids=[...new Set([...authorIds,...storyUsers])];
-      const {data: profiles,error: profileError}=ids.length ? await supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',ids) : {data:[],error:null};
+      const postIds=(rows||[]).map((p:any)=>p.id);
+      const [{data: profiles,error: profileError},{data: postLikeRows,error: likeError}]=await withTimeout(Promise.all([
+        ids.length ? supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',ids) : Promise.resolve({data:[],error:null}),
+        postIds.length ? supabase.from('post_likes').select('post_id').in('post_id',postIds) : Promise.resolve({data:[],error:null}),
+      ]));
       if (profileError) throw profileError;
+      if (likeError) throw likeError;
       const map=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-       if (!mountedRef.current) return;
-       setPosts((rows||[]).map((p:any)=>({...p,profile:map.get(p.author_id)})));
-       setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
+      const counts=(postLikeRows||[]).reduce((result:any,row:any)=>{
+        result[row.post_id]=(result[row.post_id]||0)+1;
+        return result;
+      },{} as Record<string,number>);
       const me=await getSessionUser();
+      let likeRows:any[]=[];
+      let bookmarkRows:any[]=[];
+      let followRows:any[]=[];
       if (me) {
-        const [ls,bs,fs]=await Promise.all([
+        const [ls,bs,fs]=await withTimeout(Promise.all([
           supabase.from('post_likes').select('post_id').eq('user_id',me.id),
           supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
           supabase.from('follows').select('following_id').eq('follower_id',me.id),
-        ]);
-         if (!mountedRef.current) return;
-         setLiked(new Set((ls.data||[]).map((x:any)=>x.post_id)));
-         setBookmarked(new Set((bs.data||[]).map((x:any)=>x.post_id)));
-         setFollowing(new Set((fs.data||[]).map((x:any)=>x.following_id)));
+        ]));
+        if (ls.error) throw ls.error;
+        if (bs.error) throw bs.error;
+        if (fs.error) throw fs.error;
+        likeRows=ls.data||[];
+        bookmarkRows=bs.data||[];
+        followRows=fs.data||[];
       }
-    } catch(e:any) { if (mountedRef.current) setError(e?.message || 'Could not load your feed.'); }
-    finally { loadingRef.current=false; if (mountedRef.current) { setLoading(false); setRefreshing(false); } }
+      if (!isCurrent()) return;
+      setPosts((rows||[]).map((p:any)=>({...p,media_urls:p.media_urls||[],like_count:counts[p.id]||0,profile:map.get(p.author_id)})));
+      setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
+      setLikeCounts(counts);
+      if (me) {
+        const fetchedLiked=new Set(likeRows.map((x:any)=>x.post_id));
+        const fetchedBookmarked=new Set(bookmarkRows.map((x:any)=>x.post_id));
+        const fetchedFollowing=new Set(followRows.map((x:any)=>x.following_id));
+        likeDesiredRef.current.forEach((value,id)=>value?fetchedLiked.add(id):fetchedLiked.delete(id));
+        bookmarkDesiredRef.current.forEach((value,id)=>value?fetchedBookmarked.add(id):fetchedBookmarked.delete(id));
+        followDesiredRef.current.forEach((value,id)=>value?fetchedFollowing.add(id):fetchedFollowing.delete(id));
+        likedRef.current=fetchedLiked;
+        bookmarkedRef.current=fetchedBookmarked;
+        followingRef.current=fetchedFollowing;
+        setLiked(new Set(fetchedLiked));
+        setBookmarked(new Set(fetchedBookmarked));
+        setFollowing(new Set(fetchedFollowing));
+      } else {
+        likedRef.current=new Set();
+        bookmarkedRef.current=new Set();
+        followingRef.current=new Set();
+        setLiked(new Set());
+        setBookmarked(new Set());
+        setFollowing(new Set());
+      }
+    } catch(e:any) { if (isCurrent()) setError(e?.message || 'Could not load your feed.'); }
+    finally {
+      if (loadRequestRef.current===requestId) loadingRef.current=false;
+      if (isCurrent()) { setLoading(false); setRefreshing(false); }
+    }
   },[withTimeout]);
 
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
-    const task=InteractionManager.runAfterInteractions(()=>{ if (focusedRef.current) load(); });
-    return () => { task.cancel(); focusedRef.current=false; mountedRef.current=false; };
+    focusIdRef.current+=1;
+    const task=InteractionManager.runAfterInteractions(()=>{ if (focusedRef.current) void load(); });
+    return () => {
+      task.cancel();
+      focusedRef.current=false;
+      mountedRef.current=false;
+      focusIdRef.current+=1;
+      loadingRef.current=false;
+    };
   }, [load]));
   useEffect(()=> {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -92,18 +152,98 @@ export default function Community() {
     return ()=>{ if (timer) clearTimeout(timer); supabase.removeChannel(channel); };
   },[load]);
 
-  const onLike=async(id:string)=>{
-    const was=liked.has(id); setLiked(x=>{const n=new Set(x); was?n.delete(id):n.add(id);return n;});
-    try{await togglePostLike(id);}catch(e:any){setLiked(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});Alert.alert('Like failed',e.message);}
-  };
-  const onFollow=async(id:string)=>{
-    const was=following.has(id); setFollowing(x=>{const n=new Set(x);was?n.delete(id):n.add(id);return n;});
-    try{await toggleFollow(id);}catch(e:any){setFollowing(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});Alert.alert('Follow failed',e.message);}
-  };
-  const onBookmark=async(id:string)=>{
-    const was=bookmarked.has(id); setBookmarked(x=>{const n=new Set(x);was?n.delete(id):n.add(id);return n;});
-    try{await toggleBookmark(id);}catch(e:any){setBookmarked(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});}
-  };
+  const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
+    const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
+    const next=previous.catch(()=>undefined).then(mutation).finally(()=>{
+      if(mutationQueuesRef.current.get(key)===next) mutationQueuesRef.current.delete(key);
+    });
+    mutationQueuesRef.current.set(key,next);
+  },[]);
+
+  const refreshLikeCount=useCallback(async(id:string)=>{
+    const {count,error}=await supabase.from('post_likes').select('post_id',{count:'exact',head:true}).eq('post_id',id);
+    if(error) throw error;
+    if(typeof count==='number') setLikeCounts(current=>({...current,[id]:count}));
+  },[]);
+
+  const onLike=useCallback((id:string)=>{
+    const shouldLike=!likedRef.current.has(id);
+    likeDesiredRef.current.set(id,shouldLike);
+    if(shouldLike) likedRef.current.add(id); else likedRef.current.delete(id);
+    setLiked(new Set(likedRef.current));
+    enqueueMutation(`like:${id}`,async()=>{
+      try {
+        const verified=await setPostLike(id,shouldLike);
+        try { await refreshLikeCount(id); }
+        catch(e:any) { if(mountedRef.current) Alert.alert('Like count unavailable',e?.message||'The like was saved, but its count could not be refreshed.'); }
+        if(likeDesiredRef.current.get(id)===shouldLike) {
+          likeDesiredRef.current.delete(id);
+          if(verified) likedRef.current.add(id); else likedRef.current.delete(id);
+          setLiked(new Set(likedRef.current));
+        }
+      } catch(e:any) {
+        if(likeDesiredRef.current.get(id)===shouldLike) {
+          likeDesiredRef.current.delete(id);
+          if(shouldLike) likedRef.current.delete(id); else likedRef.current.add(id);
+          setLiked(new Set(likedRef.current));
+        }
+        if(mountedRef.current) Alert.alert('Like failed',e?.message||'Could not save your like.');
+      }
+    });
+  },[enqueueMutation,refreshLikeCount]);
+
+  const onFollow=useCallback((id:string)=>{
+    const shouldFollow=!followingRef.current.has(id);
+    followDesiredRef.current.set(id,shouldFollow);
+    if(shouldFollow) followingRef.current.add(id); else followingRef.current.delete(id);
+    setFollowing(new Set(followingRef.current));
+    enqueueMutation(`follow:${id}`,async()=>{
+      try {
+        const verified=await setFollow(id,shouldFollow);
+        if(followDesiredRef.current.get(id)===shouldFollow) {
+          followDesiredRef.current.delete(id);
+          if(verified) followingRef.current.add(id); else followingRef.current.delete(id);
+          setFollowing(new Set(followingRef.current));
+        }
+      } catch(e:any) {
+        if(followDesiredRef.current.get(id)===shouldFollow) {
+          followDesiredRef.current.delete(id);
+          if(shouldFollow) followingRef.current.delete(id); else followingRef.current.add(id);
+          setFollowing(new Set(followingRef.current));
+        }
+        if(mountedRef.current) Alert.alert('Follow failed',e?.message||'Could not save your follow.');
+      }
+    });
+  },[enqueueMutation]);
+
+  const onBookmark=useCallback((id:string)=>{
+    const shouldBookmark=!bookmarkedRef.current.has(id);
+    bookmarkDesiredRef.current.set(id,shouldBookmark);
+    if(shouldBookmark) bookmarkedRef.current.add(id); else bookmarkedRef.current.delete(id);
+    setBookmarked(new Set(bookmarkedRef.current));
+    enqueueMutation(`bookmark:${id}`,async()=>{
+      try {
+        const verified=await setBookmark(id,shouldBookmark);
+        if(bookmarkDesiredRef.current.get(id)===shouldBookmark) {
+          bookmarkDesiredRef.current.delete(id);
+          if(verified) bookmarkedRef.current.add(id); else bookmarkedRef.current.delete(id);
+          setBookmarked(new Set(bookmarkedRef.current));
+        }
+      } catch(e:any) {
+        if(bookmarkDesiredRef.current.get(id)===shouldBookmark) {
+          bookmarkDesiredRef.current.delete(id);
+          if(shouldBookmark) bookmarkedRef.current.delete(id); else bookmarkedRef.current.add(id);
+          setBookmarked(new Set(bookmarkedRef.current));
+        }
+        if(mountedRef.current) Alert.alert('Bookmark failed',e?.message||'Could not save your bookmark.');
+      }
+    });
+  },[enqueueMutation]);
+
+  const onShare=useCallback(async(id:string)=>{
+    try { await addShare(id); Alert.alert('Shared','Your share was saved.'); }
+    catch(e:any) { Alert.alert('Share failed',e?.message||'Could not save your share.'); }
+  },[]);
   const sendComment=async(id:string)=>{
     if(!comment.trim())return;
     try{await addComment(id,comment);setComment('');setCommenting(null);}catch(e:any){Alert.alert('Comment failed',e.message);}
@@ -120,8 +260,8 @@ export default function Community() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>{['For you','Following','Trending','Hair girls'].map(x=><Pressable key={x} onPress={()=>setTab(x)} style={[s.tab,x===tab&&s.tabOn]}><Text style={[s.tabText,x===tab&&s.tabTextOn]}>{x}</Text></Pressable>)}</ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.stories}>
         <Pressable style={s.story} onPress={()=>router.push('/story?mode=create')}><View style={[s.storyRing,s.storyOwn]}><Avatar size={58}/><View style={s.add}><Text style={s.addText}>+</Text></View></View><Text style={s.storyName}>Your story</Text></Pressable>
-        {stories.map(st=><Pressable key={st.id} style={s.story} onPress={()=>router.push({pathname:'/story',params:{id:st.id,url:st.media_url,type:st.media_type,name:st.profile?.display_name||'Girlie'}})}>
-          <View style={s.storyRing}><Avatar size={58} /></View><Text style={s.storyName} numberOfLines={1}>{st.profile?.display_name||'Girlie'}</Text>
+         {stories.map(st=><Pressable key={st.id} style={s.story} onPress={()=>router.push({pathname:'/story',params:{id:st.id,url:st.media_url,type:st.media_type,name:st.profile?.display_name||'Girlie'}})}>
+           <View style={s.storyRing}><Avatar size={58} uri={st.profile?.avatar_url} /></View><Text style={s.storyName} numberOfLines={1}>{st.profile?.display_name||'Girlie'}</Text>
         </Pressable>)}
       </ScrollView>
       <Pressable style={s.composer} onPress={()=>router.push('/create')}><Avatar size={42}/><View style={s.ask}><Text style={s.askText}>What’s on your mind, girlie?</Text></View><I name="camera" size={24} color={C.pink}/></Pressable>
@@ -130,7 +270,7 @@ export default function Community() {
       {!loading && error && <View style={s.state}><Text style={s.stateTitle}>Feed couldn't load</Text><Text style={s.stateText}>{error}</Text><Pressable onPress={load} style={s.retry}><Text style={{color:'#FFF',fontWeight:'900'}}>Try again</Text></Pressable></View>}
   </>;
   const renderPost = ({item:p}:{item:Post}) => <View style={s.post}>
-        <View style={s.postTop}><Avatar size={43}/><View style={{flex:1}}><Text style={s.name}>{p.profile?.display_name||'Girlie'} {p.profile?.verified&&<VerifiedMark size={16}/>}</Text><Text style={s.meta}>@{p.profile?.handle||'girlie'} · {new Date(p.created_at).toLocaleDateString()}</Text></View>
+         <View style={s.postTop}><Avatar size={43} uri={p.profile?.avatar_url}/><View style={{flex:1}}><Text style={s.name}>{p.profile?.display_name||'Girlie'} {p.profile?.verified&&<VerifiedMark size={16}/>}</Text><Text style={s.meta}>@{p.profile?.handle||'girlie'} · {new Date(p.created_at).toLocaleDateString()}</Text></View>
           {p.author_id!=='' && <Pressable onPress={()=>onFollow(p.author_id)}><Text style={s.follow}>{following.has(p.author_id)?'Following': 'Follow'}</Text></Pressable>}
           <I name="more" size={21} color={C.muted}/>
         </View>
@@ -139,9 +279,9 @@ export default function Community() {
           {url.match(/\.(mp4|mov|m4v|webm)(\?|$)/i) ? <View style={s.video}><I name="camera" size={36} color="#FFF"/><Text style={s.videoText}>VIDEO</Text></View> : <Image source={{uri:url}} style={s.postImg}/>}
         </View>)}
         <View style={s.actions}>
-          <View style={s.action}><LikeButton liked={liked.has(p.id)} onPress={()=>onLike(p.id)} size={22}/><Text style={s.actionText}>{liked.has(p.id)?'Liked':'Like'}</Text></View>
+           <View style={s.action}><LikeButton liked={liked.has(p.id)} onPress={()=>onLike(p.id)} size={22}/><Text style={s.actionText}>{likeCounts[p.id] ? `${likeCounts[p.id]} · ` : ''}{liked.has(p.id)?'Liked':'Like'}</Text></View>
           <Pressable style={s.action} onPress={()=>setCommenting(commenting===p.id?null:p.id)}><I name="chat" size={20}/><Text style={s.actionText}>Comment</Text></Pressable>
-          <Pressable style={s.action}><I name="share" size={20}/><Text style={s.actionText}>Share</Text></Pressable>
+           <Pressable style={s.action} onPress={()=>onShare(p.id)}><I name="share" size={20}/><Text style={s.actionText}>Share</Text></Pressable>
           <Pressable style={s.action} onPress={()=>onBookmark(p.id)}><I name="bookmark" size={20} filled={bookmarked.has(p.id)}/></Pressable>
         </View>
         {commenting===p.id&&<View style={s.commentBox}><TextInput value={comment} onChangeText={setComment} placeholder="Write a comment…" placeholderTextColor={C.muted} style={s.commentInput}/><Pressable onPress={()=>sendComment(p.id)}><I name="send" size={22} color={C.pink}/></Pressable></View>}
@@ -157,7 +297,7 @@ export default function Community() {
       showsVerticalScrollIndicator={false}
       onScroll={onScroll}
       scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load();}}/>}
+       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loadingRef.current){setRefreshing(true);void load();}}}/>}
       removeClippedSubviews
       initialNumToRender={5}
       maxToRenderPerBatch={5}
