@@ -1,7 +1,11 @@
 import { requireSupabase } from './supabase';
 
 export async function signUp(email: string, password: string, displayName?: string) {
-  const { data, error } = await requireSupabase().auth.signUp({ email, password, options: { data: { display_name: displayName || '' } } });
+  const { data, error } = await requireSupabase().auth.signUp({
+    email,
+    password,
+    options: { data: { display_name: displayName || '' } },
+  });
   if (error) throw error;
   return data;
 }
@@ -18,7 +22,7 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  const { data, error } = await requireSupabase().auth.getUser();
-  if (error && error.message !== 'Auth session missing!') throw error;
-  return data.user;
+  const { data, error } = await requireSupabase().auth.getSession();
+  if (error) throw error;
+  return data.session?.user ?? null;
 }
