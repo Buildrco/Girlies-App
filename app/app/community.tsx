@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, Alert, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { Avatar, VerifiedMark } from '../Avatar';
@@ -31,13 +31,17 @@ export default function Community() {
   const [refreshing,setRefreshing]=useState(false);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
+  const loadingRef=useRef(false);
+  const mountedRef=useRef(true);
 
   const load = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current=true;
     try {
       setError('');
       const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await Promise.all([
-        supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(50),
-        supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(50),
+        supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(20),
+        supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(20),
       ]);
       if (postError) throw postError;
       if (storyError) throw storyError;
@@ -47,8 +51,9 @@ export default function Community() {
       const {data: profiles,error: profileError}=ids.length ? await supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',ids) : {data:[],error:null};
       if (profileError) throw profileError;
       const map=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-      setPosts((rows||[]).map((p:any)=>({...p,profile:map.get(p.author_id)})));
-      setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
+       if (!mountedRef.current) return;
+       setPosts((rows||[]).map((p:any)=>({...p,profile:map.get(p.author_id)})));
+       setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
       const me=await getSessionUser();
       if (me) {
         const [ls,bs,fs]=await Promise.all([
@@ -56,15 +61,25 @@ export default function Community() {
           supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
           supabase.from('follows').select('following_id').eq('follower_id',me.id),
         ]);
-        setLiked(new Set((ls.data||[]).map((x:any)=>x.post_id)));
-        setBookmarked(new Set((bs.data||[]).map((x:any)=>x.post_id)));
-        setFollowing(new Set((fs.data||[]).map((x:any)=>x.following_id)));
+         if (!mountedRef.current) return;
+         setLiked(new Set((ls.data||[]).map((x:any)=>x.post_id)));
+         setBookmarked(new Set((bs.data||[]).map((x:any)=>x.post_id)));
+         setFollowing(new Set((fs.data||[]).map((x:any)=>x.following_id)));
       }
-    } catch(e:any) { setError(e?.message || 'Could not load your feed.'); }
-    finally { setLoading(false); setRefreshing(false); }
+    } catch(e:any) { if (mountedRef.current) setError(e?.message || 'Could not load your feed.'); }
+    finally { loadingRef.current=false; if (mountedRef.current) { setLoading(false); setRefreshing(false); } }
   },[]);
 
-  useEffect(()=>{ load(); const channel=supabase.channel('girlies-feed').on('postgres_changes',{event:'*',schema:'public',table:'posts'},()=>load()).on('postgres_changes',{event:'*',schema:'public',table:'stories'},()=>load()).on('postgres_changes',{event:'*',schema:'public',table:'post_likes'},()=>{}).subscribe(); return ()=>{supabase.removeChannel(channel);}; },[load]);
+  useFocusEffect(useCallback(() => { mountedRef.current=true; load(); return () => { mountedRef.current=false; }; }, [load]));
+  useEffect(()=> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleLoad=()=>{ if (timer) clearTimeout(timer); timer=setTimeout(load,350); };
+    const channel=supabase.channel('girlies-feed')
+      .on('postgres_changes',{event:'*',schema:'public',table:'posts'},scheduleLoad)
+      .on('postgres_changes',{event:'*',schema:'public',table:'stories'},scheduleLoad)
+      .subscribe();
+    return ()=>{ if (timer) clearTimeout(timer); supabase.removeChannel(channel); };
+  },[load]);
 
   const onLike=async(id:string)=>{
     const was=liked.has(id); setLiked(x=>{const n=new Set(x); was?n.delete(id):n.add(id);return n;});
@@ -85,9 +100,7 @@ export default function Community() {
 
   const visiblePosts=useMemo(()=>tab==='Following'?posts.filter(p=>following.has(p.author_id)):posts, [posts,tab,following]);
 
-  return <SafeAreaView style={s.safe}>
-    <Animated.ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load();}}/>}>
+  const header = <>
       <View style={s.top}>
         <Pressable onPress={()=>router.push('/notifications')} style={s.iconButton}><I name="bell" size={25}/></Pressable>
         <Text style={s.h}>Feed</Text>
@@ -104,9 +117,8 @@ export default function Community() {
 
       {loading && <View style={s.state}><ActivityIndicator color={C.pink}/><Text style={s.stateText}>Loading your girls…</Text></View>}
       {!loading && error && <View style={s.state}><Text style={s.stateTitle}>Feed couldn't load</Text><Text style={s.stateText}>{error}</Text><Pressable onPress={load} style={s.retry}><Text style={{color:'#FFF',fontWeight:'900'}}>Try again</Text></Pressable></View>}
-      {!loading && !error && visiblePosts.length===0 && <View style={s.state}><Text style={{fontSize:40}}>✦</Text><Text style={s.stateTitle}>{tab==='Following'?'Follow some girlies':'Your feed is ready'}</Text><Text style={s.stateText}>{tab==='Following'?'Follow people to see their posts here.':'Be the first to share something with the girls.'}</Text></View>}
-
-      {visiblePosts.map(p=><View key={p.id} style={s.post}>
+  </>;
+  const renderPost = ({item:p}:{item:Post}) => <View style={s.post}>
         <View style={s.postTop}><Avatar size={43}/><View style={{flex:1}}><Text style={s.name}>{p.profile?.display_name||'Girlie'} {p.profile?.verified&&<VerifiedMark size={16}/>}</Text><Text style={s.meta}>@{p.profile?.handle||'girlie'} · {new Date(p.created_at).toLocaleDateString()}</Text></View>
           {p.author_id!=='' && <Pressable onPress={()=>onFollow(p.author_id)}><Text style={s.follow}>{following.has(p.author_id)?'Following': 'Follow'}</Text></Pressable>}
           <I name="more" size={21} color={C.muted}/>
@@ -122,8 +134,24 @@ export default function Community() {
           <Pressable style={s.action} onPress={()=>onBookmark(p.id)}><I name="bookmark" size={20} filled={bookmarked.has(p.id)}/></Pressable>
         </View>
         {commenting===p.id&&<View style={s.commentBox}><TextInput value={comment} onChangeText={setComment} placeholder="Write a comment…" placeholderTextColor={C.muted} style={s.commentInput}/><Pressable onPress={()=>sendComment(p.id)}><I name="send" size={22} color={C.pink}/></Pressable></View>}
-      </View>)}
-    </Animated.ScrollView>
+      </View>;
+  return <SafeAreaView style={s.safe}>
+    <Animated.FlatList
+      data={visiblePosts}
+      renderItem={renderPost}
+      keyExtractor={item=>item.id}
+      ListHeaderComponent={header}
+      ListEmptyComponent={!loading&&!error ? <View style={s.state}><Text style={{fontSize:40}}>✦</Text><Text style={s.stateTitle}>{tab==='Following'?'Follow some girlies':'Your feed is ready'}</Text><Text style={s.stateText}>{tab==='Following'?'Follow people to see their posts here.':'Be the first to share something with the girls.'}</Text></View> : null}
+      contentContainerStyle={s.scroll}
+      showsVerticalScrollIndicator={false}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load();}}/>}
+      removeClippedSubviews
+      initialNumToRender={5}
+      maxToRenderPerBatch={5}
+      windowSize={5}
+    />
     <Pressable style={[s.fab,{transform:[{translateY:visibility.interpolate({inputRange:[0,1],outputRange:[90,0]})}]}]} onPress={()=>router.push('/create')}><I name="plus" size={28} color="#FFF"/></Pressable>
   </SafeAreaView>;
 }

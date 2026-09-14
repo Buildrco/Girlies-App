@@ -10,3 +10,114 @@ create table if not exists messages(id uuid primary key default gen_random_uuid(
 create table if not exists orders(id uuid primary key default gen_random_uuid(), buyer_id uuid references profiles(id), store_id uuid references stores(id), product_id uuid references products(id), quantity int not null, subtotal numeric(12,2) not null, delivery_fee numeric(12,2), address jsonb not null, payment_reference text unique, payment_status text default 'pending', fulfillment_status text default 'awaiting_payment', created_at timestamptz default now());
 create table if not exists bids(id uuid primary key default gen_random_uuid(), product_id uuid references products(id), bidder_id uuid references profiles(id), amount numeric(12,2) not null, created_at timestamptz default now());
 create index if not exists products_category_idx on products(category); create index if not exists products_store_idx on products(store_id); create index if not exists posts_author_idx on posts(author_id); create index if not exists messages_conversation_idx on messages(conversation_id); create index if not exists orders_buyer_idx on orders(buyer_id);
+
+create table if not exists stories(id uuid primary key default gen_random_uuid(), user_id uuid not null references profiles(id) on delete cascade, media_url text not null, media_type text not null default 'image', caption text default '', created_at timestamptz default now(), expires_at timestamptz default (now() + interval '24 hours'));
+create table if not exists story_views(story_id uuid not null references stories(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, viewed_at timestamptz default now(), primary key(story_id,user_id));
+create table if not exists post_likes(post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, created_at timestamptz default now(), primary key(post_id,user_id));
+create table if not exists post_comments(id uuid primary key default gen_random_uuid(), post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, parent_id uuid references post_comments(id) on delete cascade, body text not null, created_at timestamptz default now());
+create table if not exists bookmarks(post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, created_at timestamptz default now(), primary key(post_id,user_id));
+create index if not exists stories_expiry_idx on stories(expires_at);
+create index if not exists post_likes_user_idx on post_likes(user_id);
+create index if not exists post_comments_post_idx on post_comments(post_id,created_at);
+create index if not exists bookmarks_user_idx on bookmarks(user_id);
+
+alter table profiles enable row level security;
+alter table posts enable row level security;
+alter table follows enable row level security;
+alter table stories enable row level security;
+alter table story_views enable row level security;
+alter table post_likes enable row level security;
+alter table post_comments enable row level security;
+alter table bookmarks enable row level security;
+
+drop policy if exists profiles_read on profiles;
+create policy profiles_read on profiles for select using (true);
+drop policy if exists profiles_update_own on profiles;
+create policy profiles_update_own on profiles for update using (auth.uid() = id) with check (auth.uid() = id);
+drop policy if exists posts_read_public on posts;
+create policy posts_read_public on posts for select using (visibility = 'public' or auth.uid() = author_id);
+drop policy if exists posts_insert_own on posts;
+create policy posts_insert_own on posts for insert with check (auth.uid() = author_id);
+drop policy if exists posts_update_own on posts;
+create policy posts_update_own on posts for update using (auth.uid() = author_id) with check (auth.uid() = author_id);
+drop policy if exists posts_delete_own on posts;
+create policy posts_delete_own on posts for delete using (auth.uid() = author_id);
+drop policy if exists follows_read on follows;
+create policy follows_read on follows for select using (true);
+drop policy if exists follows_insert_own on follows;
+create policy follows_insert_own on follows for insert with check (auth.uid() = follower_id and follower_id <> following_id);
+drop policy if exists follows_delete_own on follows;
+create policy follows_delete_own on follows for delete using (auth.uid() = follower_id);
+drop policy if exists stories_read on stories;
+create policy stories_read on stories for select using (expires_at > now() or auth.uid() = user_id);
+drop policy if exists stories_insert_own on stories;
+create policy stories_insert_own on stories for insert with check (auth.uid() = user_id);
+drop policy if exists stories_update_own on stories;
+create policy stories_update_own on stories for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists stories_delete_own on stories;
+create policy stories_delete_own on stories for delete using (auth.uid() = user_id);
+drop policy if exists story_views_read_own on story_views;
+create policy story_views_read_own on story_views for select using (auth.uid() = user_id);
+drop policy if exists story_views_insert_own on story_views;
+create policy story_views_insert_own on story_views for insert with check (auth.uid() = user_id);
+drop policy if exists post_likes_read on post_likes;
+create policy post_likes_read on post_likes for select using (true);
+drop policy if exists post_likes_insert_own on post_likes;
+create policy post_likes_insert_own on post_likes for insert with check (auth.uid() = user_id);
+drop policy if exists post_likes_delete_own on post_likes;
+create policy post_likes_delete_own on post_likes for delete using (auth.uid() = user_id);
+drop policy if exists post_comments_read on post_comments;
+create policy post_comments_read on post_comments for select using (true);
+drop policy if exists post_comments_insert_own on post_comments;
+create policy post_comments_insert_own on post_comments for insert with check (auth.uid() = user_id);
+drop policy if exists post_comments_update_own on post_comments;
+create policy post_comments_update_own on post_comments for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists post_comments_delete_own on post_comments;
+create policy post_comments_delete_own on post_comments for delete using (auth.uid() = user_id);
+drop policy if exists bookmarks_read_own on bookmarks;
+create policy bookmarks_read_own on bookmarks for select using (auth.uid() = user_id);
+drop policy if exists bookmarks_insert_own on bookmarks;
+create policy bookmarks_insert_own on bookmarks for insert with check (auth.uid() = user_id);
+drop policy if exists bookmarks_delete_own on bookmarks;
+create policy bookmarks_delete_own on bookmarks for delete using (auth.uid() = user_id);
+
+create or replace function update_profile_follow_counts() returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    update profiles set following_count = following_count + 1 where id = new.follower_id;
+    update profiles set followers_count = followers_count + 1 where id = new.following_id;
+    return new;
+  elsif tg_op = 'DELETE' then
+    update profiles set following_count = greatest(0, following_count - 1) where id = old.follower_id;
+    update profiles set followers_count = greatest(0, followers_count - 1) where id = old.following_id;
+    return old;
+  end if;
+  return null;
+end; $$;
+drop trigger if exists follows_profile_counts on follows;
+create trigger follows_profile_counts after insert or delete on follows for each row execute function update_profile_follow_counts();
+
+create or replace function handle_new_user() returns trigger language plpgsql security definer set search_path = public as $$
+declare base_handle text;
+begin
+  base_handle := lower(regexp_replace(coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1), 'girlie'), '[^a-zA-Z0-9]+', '', 'g'));
+  if base_handle = '' then base_handle := 'girlie'; end if;
+  insert into public.profiles(id, display_name, handle)
+  values (new.id, coalesce(nullif(new.raw_user_meta_data->>'display_name',''), 'Girlie'), left(base_handle, 20) || '_' || right(replace(new.id::text,'-',''), 6))
+  on conflict (id) do nothing;
+  return new;
+end; $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute function handle_new_user();
+
+insert into storage.buckets (id, name, public)
+values ('social-media', 'social-media', true)
+on conflict (id) do update set public = excluded.public;
+drop policy if exists social_media_read on storage.objects;
+create policy social_media_read on storage.objects for select using (bucket_id = 'social-media');
+drop policy if exists social_media_insert_own on storage.objects;
+create policy social_media_insert_own on storage.objects for insert with check (bucket_id = 'social-media' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists social_media_update_own on storage.objects;
+create policy social_media_update_own on storage.objects for update using (bucket_id = 'social-media' and auth.uid()::text = (storage.foldername(name))[1]);
+drop policy if exists social_media_delete_own on storage.objects;
+create policy social_media_delete_own on storage.objects for delete using (bucket_id = 'social-media' and auth.uid()::text = (storage.foldername(name))[1]);
