@@ -32,7 +32,6 @@ jobs:
         run: node -e "require.resolve('expo-router/package.json'); console.log('expo-router OK')"
 
       - name: Publish Android OTA
-        run: npx eas-cli@latest update --platform android --channel preview --message "Girlies OTA update"
+        run: npx eas-cli@latest update --platform android --channel production --message "Girlies OTA update"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          
