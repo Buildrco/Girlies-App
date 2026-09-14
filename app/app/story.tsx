@@ -24,10 +24,15 @@ export default function Story() {
     if (!permission.granted) { Alert.alert('Permission needed', 'Allow Girlies to access photos and videos.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images','videos'], allowsEditing: true, quality: 0.9,
-    } as any);
+    });
     if (result.canceled) return;
-    const a: any = result.assets[0];
-    setMedia({ uri:a.uri, type:a.type === 'video' ? 'video' : 'image', name:a.fileName || undefined });
+    const a: ImagePicker.ImagePickerAsset = result.assets[0];
+    setMedia({
+      uri: a.uri,
+      type: a.type === 'video' ? 'video' : 'image',
+      name: a.fileName || undefined,
+      mimeType: a.mimeType || undefined,
+    });
   }
 
   async function publish() {
