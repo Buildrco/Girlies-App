@@ -20,7 +20,13 @@ export default function Layout() {
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <StatusBar style="dark" />
     <ChromeVisibilityProvider>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          detachInactiveScreens: false,
+          freezeOnBlur: false,
+        }}
+      >
         <Stack.Screen name="home" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
         <Stack.Screen name="shop" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
         <Stack.Screen name="community" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
