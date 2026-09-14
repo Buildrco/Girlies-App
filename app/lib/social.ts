@@ -228,11 +228,15 @@ export async function addShare(postId: string) {
 }
 
 export async function markStoryViewed(storyId: string) {
-  const me = await getSessionUser();
-  if (!me) return;
-  const { error } = await supabase.from('story_views').upsert(
-    { story_id: storyId, user_id: me.id },
-    { onConflict: 'story_id,user_id' },
-  );
-  if (error) console.warn('Could not mark story as viewed:', error.message);
+  try {
+    const me = await getSessionUser();
+    if (!me) return;
+    const { error } = await supabase.from('story_views').upsert(
+      { story_id: storyId, user_id: me.id },
+      { onConflict: 'story_id,user_id' },
+    );
+    if (error) console.warn('Could not mark story as viewed:', error.message);
+  } catch (error) {
+    console.warn('Could not mark story as viewed:', errorMessage(error, 'unknown error'));
+  }
 }
