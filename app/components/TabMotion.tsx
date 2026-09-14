@@ -9,7 +9,7 @@ export function TabMotion({ children }: { children: React.ReactNode }) {
   const translateX = useRef(new Animated.Value(direction * Dimensions.get('window').width)).current;
   useEffect(() => {
     translateX.setValue(direction * Dimensions.get('window').width);
-    Animated.timing(translateX, { toValue: 0, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(translateX, { toValue: 0, duration: 480, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [direction, translateX]);
   return <Animated.View style={{ flex: 1, backgroundColor: C.bg, transform: [{ translateX }] }}>{children}</Animated.View>;
 }

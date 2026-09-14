@@ -30,14 +30,15 @@ export function BottomNav({ active, visibility }: { active: string; visibility?:
   const progress = useRef(new Animated.Value(expanded === active ? 1 : 0)).current;
 
   useEffect(() => {
-    Animated.timing(progress, { toValue: expanded === active ? 1 : 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(progress, { toValue: expanded === active ? 1 : 0, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [active, expanded, progress]);
 
   const goToTab = (label: string, path: string, index: number) => {
     setExpanded(label);
     if (index === activeIndex) return;
     const direction = index > activeIndex ? '1' : '-1';
-    router.replace({ pathname: path as any, params: { tabDirection: direction, navExpanded: label } } as any);
+    const timer = setTimeout(() => router.replace({ pathname: path as any, params: { tabDirection: direction, navExpanded: label } } as any), 220);
+    return () => clearTimeout(timer);
   };
 
   const translateY = visibility?.interpolate({ inputRange: [0, 1], outputRange: [105, 0] }) || 0;
@@ -48,8 +49,8 @@ export function BottomNav({ active, visibility }: { active: string; visibility?:
       const isExpanded = expanded === label && isActive;
       const width = isExpanded ? progress.interpolate({ inputRange: [0, 1], outputRange: [38, labelWidths[label]] }) : 38;
       return <MotionPressable key={label} onPress={() => goToTab(label, path, index)} style={styles.slot}>
-        <Animated.View style={[styles.item, { width, backgroundColor: isActive ? C.rose : 'transparent' }]}>
-          <I name={icon} size={20} color={isActive ? C.pink : C.ink} filled={isActive} />
+         <Animated.View style={[styles.item, { width, backgroundColor: isActive ? C.rose : 'transparent' }]}>
+           <I name={icon} size={23} color={isActive ? C.pink : C.ink} filled={isActive} />
           {isExpanded && <Animated.Text style={[styles.label, { opacity: progress, transform: [{ translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-7, 0] }) }] }]}>{label}</Animated.Text>}
         </Animated.View>
       </MotionPressable>;
@@ -57,4 +58,4 @@ export function BottomNav({ active, visibility }: { active: string; visibility?:
   </Animated.View>;
 }
 
-const styles = { nav: { position: 'absolute' as const, left: 14, right: 14, bottom: 12, height: 58, borderRadius: 25, backgroundColor: '#FFF', borderWidth: 1, borderColor: C.line, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-around' as const, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, elevation: 10, zIndex: 20 }, slot: { flex: 1, height: 48, alignItems: 'center' as const, justifyContent: 'center' as const }, item: { height: 36, minWidth: 38, paddingHorizontal: 7, borderRadius: 18, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 5, overflow: 'hidden' as const }, label: { color: C.ink, fontSize: 11, fontWeight: '800' as const } };
+const styles = { nav: { position: 'absolute' as const, left: 14, right: 14, bottom: 12, height: 58, borderRadius: 25, paddingHorizontal: 8, backgroundColor: '#FFF', borderWidth: 1, borderColor: C.line, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, elevation: 10, zIndex: 20 }, slot: { minWidth: 50, height: 48, alignItems: 'center' as const, justifyContent: 'center' as const }, item: { height: 36, minWidth: 38, paddingHorizontal: 7, borderRadius: 18, flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: 5, overflow: 'hidden' as const }, label: { color: C.ink, fontSize: 11, fontWeight: '800' as const } };
