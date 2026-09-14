@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -10,6 +10,9 @@ import { ProductCard } from '../components/ProductCard';
 import { SectionTitle } from '../components/SectionTitle';
 import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
+import { useFocusEffect } from 'expo-router';
+import { supabase } from '../lib/supabase';
+import { getPostLikeState, getSessionUser, setFollow, setPostLike } from '../lib/social';
 
 const imgs = [
   'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1000&q=85',
@@ -23,9 +26,96 @@ export default function Home() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
   const [hero, setHero] = useState(0);
-  const [followed, setFollowed] = useState<number[]>([]);
+  const [followed, setFollowed] = useState<Set<number>>(new Set());
+  const [sellerIds, setSellerIds] = useState<(string | null)[]>([]);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [followingBusy, setFollowingBusy] = useState<Set<number>>(new Set());
+  const [productIds, setProductIds] = useState<string[]>([]);
+  const [homePostId, setHomePostId] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
+  const [homeLikeCount, setHomeLikeCount] = useState<number | null>(null);
+  const [likeBusy, setLikeBusy] = useState(false);
   const sellers = ['Nia Hair', 'Amara Beauty', 'Glow Room', 'The Bag Edit', 'Scent Lab'];
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    async function loadLiveState() {
+      try {
+        const me = await getSessionUser();
+        if (!active) return;
+        setSessionUserId(me?.id || null);
+        const [profilesResult, productsResult, postResult] = await Promise.all([
+          supabase.from('profiles').select('id').order('created_at', { ascending: true }).limit(sellers.length),
+          supabase.from('products').select('id').order('created_at', { ascending: false }).limit(sellers.length),
+          supabase.from('posts').select('id').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
+        ]);
+        if (profilesResult.error) throw profilesResult.error;
+        if (productsResult.error) throw productsResult.error;
+        if (postResult.error) throw postResult.error;
+        const liveSellerIds = (profilesResult.data || []).map(row => row.id);
+        setSellerIds(liveSellerIds);
+        setProductIds((productsResult.data || []).map(row => row.id));
+        const postId = postResult.data?.[0]?.id || null;
+        setHomePostId(postId);
+        if (!me || !postId) {
+          setFollowed(new Set());
+          setLiked(false);
+          setHomeLikeCount(postId ? 0 : null);
+          return;
+        }
+        const [followResult, likeResult, countResult] = await Promise.all([
+          supabase.from('follows').select('following_id').eq('follower_id', me.id),
+          getPostLikeState(postId),
+          supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId),
+        ]);
+        if (followResult.error) throw followResult.error;
+        if (countResult.error) throw countResult.error;
+        if (!active) return;
+        const followedIds = new Set((followResult.data || []).map(row => row.following_id));
+        setFollowed(new Set(liveSellerIds.map((id, index) => followedIds.has(id) ? index : -1).filter(index => index >= 0)));
+        setLiked(likeResult);
+        setHomeLikeCount(countResult.count || 0);
+      } catch (error) {
+        if (active) Alert.alert('Could not load live activity', error instanceof Error ? error.message : 'Please try again.');
+      }
+    }
+    void loadLiveState();
+    return () => { active = false; };
+  }, []));
+
+  async function toggleSeller(index: number) {
+    const targetId = sellerIds[index];
+    if (!targetId) { Alert.alert('Follow unavailable', 'This seller is not connected to a live profile yet.'); return; }
+    if (!sessionUserId) { Alert.alert('Sign in required', 'Please sign in to follow sellers.'); return; }
+    if (targetId === sessionUserId) { Alert.alert('Follow unavailable', 'You cannot follow your own profile.'); return; }
+    if (followingBusy.has(index)) return;
+    const next = !followed.has(index);
+    setFollowingBusy(current => new Set(current).add(index));
+    try {
+      const verified = await setFollow(targetId, next);
+      setFollowed(current => { const copy = new Set(current); if (verified) copy.add(index); else copy.delete(index); return copy; });
+    } catch (error) {
+      Alert.alert('Follow failed', error instanceof Error ? error.message : 'Could not save your follow.');
+    } finally {
+      setFollowingBusy(current => { const copy = new Set(current); copy.delete(index); return copy; });
+    }
+  }
+
+  async function toggleHomeLike() {
+    if (!homePostId) { Alert.alert('Like unavailable', 'There is no live post to like yet.'); return; }
+    if (likeBusy) return;
+    const next = !liked;
+    setLiked(next);
+    setLikeBusy(true);
+    try {
+      const verified = await setPostLike(homePostId, next);
+      setLiked(verified);
+      setHomeLikeCount(current => Math.max(0, (current || 0) + (verified === next ? (next ? 1 : -1) : 0)));
+    } catch (error) {
+      setLiked(!next);
+      Alert.alert('Like failed', error instanceof Error ? error.message : 'Could not save your like.');
+    } finally { setLikeBusy(false); }
+  }
   return <SafeAreaView style={s.safe}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} /></Pressable></View></View>
@@ -33,12 +123,12 @@ export default function Home() {
       <View><CurvedBanner image={imgs[hero]} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][hero]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][hero]} color={[C.rose, C.sun, C.lilac][hero]} onPress={() => router.push('/shop')} /><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
       <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>
       <SectionTitle title="Popular sellers" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellers.map((name, index) => <Pressable key={name} onPress={() => router.push('/seller/' + index)} style={s.seller}><Avatar size={54} index={index} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{name}</Text><VerifiedMark size={17} /></View><Text style={s.sellerMeta}>{[12.4, 8.3, 6.8, 5.1, 4.7][index]}k followers</Text><Pressable onPress={event => { event.stopPropagation(); setFollowed(current => current.includes(index) ? current.filter(item => item !== index) : [...current, index]); }} style={s.follow}><Text style={s.followText}>{followed.includes(index) ? 'Following' : 'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellers.map((name, index) => <Pressable key={name} onPress={() => router.push('/seller/' + index)} style={s.seller}><Avatar size={54} index={index} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{name}</Text><VerifiedMark size={17} /></View><Text style={s.sellerMeta}>{[12.4, 8.3, 6.8, 5.1, 4.7][index]}k followers</Text><Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
       <SectionTitle title="Popular products" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{['Silk press wig', 'Rose oud perfume', 'Everyday tote', 'Glow kit', 'Satin set'].map((name, index) => <ProductCard key={name} name={name} price={'GH₵ ' + [480, 320, 260, 190, 150][index]} image={imgs[(index + 1) % imgs.length]} seller={['Nia Hair', 'Scent Lab', 'Amara Store', 'Glow Room', 'Nia Closet'][index]} onPress={() => router.push({ pathname: '/product', params: { id: String(index) } })} />)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{['Silk press wig', 'Rose oud perfume', 'Everyday tote', 'Glow kit', 'Satin set'].map((name, index) => <ProductCard key={name} productId={productIds[index]} name={name} price={'GH₵ ' + [480, 320, 260, 190, 150][index]} image={imgs[(index + 1) % imgs.length]} seller={['Nia Hair', 'Scent Lab', 'Amara Store', 'Glow Room', 'Nia Closet'][index]} onPress={() => router.push({ pathname: '/product', params: { id: String(index) } })} />)}</ScrollView>
       <View style={s.editorial}><Image source={{ uri: imgs[3] }} style={s.editorialImg} /><View style={s.editorialText}><Text style={s.editorialK}>THE GIRLIE GUIDE</Text><Text style={s.editorialTitle}>Good taste is better when shared.</Text><Text style={s.editorialSub}>Save a look. Ask the community. Find the shop. Make it yours.</Text><Pressable onPress={() => router.push('/community')} style={s.darkBtn}><Text style={{ color: '#FFF', fontWeight: '900' }}>See what girls are saying</Text></Pressable></View></View>
       <SectionTitle title="Fresh on the feed" />
-      <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>Ama's corner</Text><VerifiedMark size={15} /></View><Text style={s.postMeta}>12 min · Accra</Text></View><I name="more" size={20} color={C.muted} /></View><Text style={s.postText}>Girls, help me choose 😭 Which one would you wear to a garden wedding?</Text><Image source={{ uri: imgs[1] }} style={s.postImg} /><View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => setLiked(!liked)} size={21} /><Text> {liked ? 285 : 284}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> 48</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> 16</Text></View></View></Pressable>
+      <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>Ama's corner</Text><VerifiedMark size={15} /></View><Text style={s.postMeta}>12 min · Accra</Text></View><I name="more" size={20} color={C.muted} /></View><Text style={s.postText}>Girls, help me choose 😭 Which one would you wear to a garden wedding?</Text><Image source={{ uri: imgs[1] }} style={s.postImg} /><View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> 48</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> 16</Text></View></View></Pressable>
       <View style={s.mini}><Text style={s.miniTitle}>Delivered without the stress.</Text><Text style={s.miniText}>Pay once. We calculate delivery and keep you updated.</Text><Pressable onPress={() => router.push('/orders')}><Text style={s.miniLink}>Track an order →</Text></Pressable></View>
       <View style={{ marginTop: 18 }}><SectionTitle title="Your spaces" /><View style={{ flexDirection: 'row', gap: 8 }}><Pressable onPress={() => router.push('/live')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.plum }}><Text style={{ fontSize: 10, fontWeight: '900', color: C.sun }}>LIVE NOW</Text><Text style={{ fontSize: 16, fontWeight: '900', color: '#FFF', marginTop: 5 }}>Watch girls live</Text><Text style={{ fontSize: 10, color: '#EADDE4', marginTop: 4 }}>Join the room →</Text></Pressable><Pressable onPress={() => router.push('/seller-onboarding')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.rose }}><Text style={{ fontSize: 10, fontWeight: '900' }}>SELL WITH US</Text><Text style={{ fontSize: 16, fontWeight: '900', marginTop: 5 }}>Open your shop</Text><Text style={{ fontSize: 10, marginTop: 4, fontWeight: '800' }}>Start here →</Text></Pressable></View></View>
     </Animated.ScrollView>
