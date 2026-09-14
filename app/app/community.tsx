@@ -336,7 +336,7 @@ export default function Community() {
       showsVerticalScrollIndicator={false}
       onScroll={onScroll}
       scrollEventThrottle={16}
-       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loadingRef.current){setRefreshing(true);void load();}}}/>}
+       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(focusedRef.current&&!loadingRef.current){setRefreshing(true);void load();}}}/>}
       initialNumToRender={5}
       maxToRenderPerBatch={5}
       windowSize={5}
