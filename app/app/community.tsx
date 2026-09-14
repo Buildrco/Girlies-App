@@ -20,7 +20,7 @@ type Story = {id:string;user_id:string;media_url:string;media_type:'image'|'vide
 
 export default function Community() {
   const router = useRouter();
-  const { visibility, onScroll } = useChromeVisibility();
+  const { visibility, onScroll, reset } = useChromeVisibility();
   const [tab,setTab]=useState('For you');
   const [posts,setPosts]=useState<Post[]>([]);
   const [stories,setStories]=useState<Story[]>([]);
@@ -109,13 +109,8 @@ export default function Community() {
     try {
       const me=await getSessionUser();
       if (!me) {
-        if (!isCurrentFocus(generation)) return;
-        likedRef.current=new Set();
-        bookmarkedRef.current=new Set();
-        followingRef.current=new Set();
-        setLiked(new Set());
-        setBookmarked(new Set());
-        setFollowing(new Set());
+        // Keep the current optimistic state if auth is still restoring on refocus.
+        // A successful Supabase query below replaces it with the source of truth.
         return;
       }
       const [likeResult,bookmarkResult,followResult]=await withTimeout(Promise.all([
@@ -181,15 +176,17 @@ export default function Community() {
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
+    reset();
     focusGenerationRef.current+=1;
     void load();
     return () => {
+      reset();
       focusedRef.current=false;
       mountedRef.current=false;
       focusGenerationRef.current+=1;
       loadingRef.current=false;
     };
-  },[load]));
+  },[load,reset]));
 
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
     const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
