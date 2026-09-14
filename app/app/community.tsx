@@ -44,6 +44,7 @@ export default function Community() {
   const followDesiredRef=useRef(new Map<string,boolean>());
   const bookmarkDesiredRef=useRef(new Map<string,boolean>());
   const mutationQueuesRef=useRef(new Map<string,Promise<void>>());
+  const loadRef=useRef<()=>Promise<void>>(() => Promise.resolve());
 
   const withTimeout = useCallback(<T,>(promise: Promise<T>, ms=8000) => new Promise<T>((resolve,reject) => {
     const timer=setTimeout(()=>reject(new Error('Feed request timed out. Check your connection and try again.')),ms);
@@ -173,6 +174,8 @@ export default function Community() {
     }
   },[hydrateCommunity,isCurrentFocus,withTimeout]);
 
+  loadRef.current=load;
+
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
@@ -186,7 +189,7 @@ export default function Community() {
       focusGenerationRef.current+=1;
       loadingRef.current=false;
     };
-  },[load,reset]));
+  },[reset]));
 
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
     const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
