@@ -191,26 +191,6 @@ export default function Community() {
     };
   },[load]));
 
-  useEffect(()=> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const scheduleLoad=()=>{
-      if (!focusedRef.current) return;
-      if (timer) clearTimeout(timer);
-      timer=setTimeout(()=>{
-        timer=undefined;
-        void load();
-      },350);
-    };
-    const channel=supabase.channel('girlies-feed')
-      .on('postgres_changes',{event:'*',schema:'public',table:'posts'},scheduleLoad)
-      .on('postgres_changes',{event:'*',schema:'public',table:'stories'},scheduleLoad)
-      .subscribe();
-    return ()=>{
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  },[load]);
-
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
     const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
     const next=previous.catch(()=>undefined).then(mutation).finally(()=>{
