@@ -33,16 +33,22 @@ export default function Community() {
   const [error,setError]=useState('');
   const loadingRef=useRef(false);
   const mountedRef=useRef(true);
+  const focusedRef=useRef(false);
+
+  const withTimeout = useCallback(<T,>(promise: Promise<T>, ms=8000) => new Promise<T>((resolve,reject) => {
+    const timer=setTimeout(()=>reject(new Error('Feed request timed out. Check your connection and try again.')),ms);
+    promise.then(value=>{clearTimeout(timer);resolve(value);},reason=>{clearTimeout(timer);reject(reason);});
+  }),[]);
 
   const load = useCallback(async () => {
-    if (loadingRef.current) return;
+    if (loadingRef.current || !focusedRef.current) return;
     loadingRef.current=true;
     try {
       setError('');
-      const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await Promise.all([
+      const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await withTimeout(Promise.all([
         supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(20),
         supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(20),
-      ]);
+      ]));
       if (postError) throw postError;
       if (storyError) throw storyError;
       const authorIds=[...new Set((rows||[]).map((p:any)=>p.author_id))];
@@ -68,12 +74,12 @@ export default function Community() {
       }
     } catch(e:any) { if (mountedRef.current) setError(e?.message || 'Could not load your feed.'); }
     finally { loadingRef.current=false; if (mountedRef.current) { setLoading(false); setRefreshing(false); } }
-  },[]);
+  },[withTimeout]);
 
-  useFocusEffect(useCallback(() => { mountedRef.current=true; load(); return () => { mountedRef.current=false; }; }, [load]));
+  useFocusEffect(useCallback(() => { mountedRef.current=true; focusedRef.current=true; load(); return () => { focusedRef.current=false; mountedRef.current=false; }; }, [load]));
   useEffect(()=> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const scheduleLoad=()=>{ if (timer) clearTimeout(timer); timer=setTimeout(load,350); };
+    const scheduleLoad=()=>{ if (!focusedRef.current) return; if (timer) clearTimeout(timer); timer=setTimeout(load,350); };
     const channel=supabase.channel('girlies-feed')
       .on('postgres_changes',{event:'*',schema:'public',table:'posts'},scheduleLoad)
       .on('postgres_changes',{event:'*',schema:'public',table:'stories'},scheduleLoad)

@@ -4,11 +4,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
 
-function tabAnimation(route: { params?: object }) {
-  const direction = (route.params as { tabDirection?: string } | undefined)?.tabDirection;
-  return direction === '-1' ? 'slide_from_left' as const : 'slide_from_right' as const;
-}
-
 function NavigationChrome() {
   const pathname = usePathname();
   const { reset } = useChromeVisibility();
@@ -26,10 +21,10 @@ export default function Layout() {
           freezeOnBlur: false,
         }}
       >
-        <Stack.Screen name="home" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
-        <Stack.Screen name="shop" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
-        <Stack.Screen name="community" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
-        <Stack.Screen name="profile" options={({ route }) => ({ animation: tabAnimation(route), animationDuration: 380 })} />
+        <Stack.Screen name="home" options={{ animation: 'none' }} />
+        <Stack.Screen name="shop" options={{ animation: 'none' }} />
+        <Stack.Screen name="community" options={{ animation: 'none' }} />
+        <Stack.Screen name="profile" options={{ animation: 'none' }} />
       </Stack>
       <NavigationChrome />
     </ChromeVisibilityProvider>

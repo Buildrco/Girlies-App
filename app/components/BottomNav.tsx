@@ -89,8 +89,7 @@ export function BottomNav() {
 
   const goToTab = (label:string, path:string, index:number) => {
     if (index === activeIndex) return;
-    const direction = index > activeIndex ? '1' : '-1';
-    router.replace({ pathname: path as any, params: { tabDirection: direction } } as any);
+    router.replace(path as any);
   };
 
   if (!activeItem) return null;
