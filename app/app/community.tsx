@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Animated, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -8,166 +8,132 @@ import { Avatar, VerifiedMark } from '../Avatar';
 import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { supabase } from '../lib/supabase';
+import { addComment, getSessionUser, toggleFollow, togglePostLike, toggleBookmark } from '../lib/social';
 
-type Profile = { id: string; display_name: string; handle: string; bio: string; avatar_url: string | null; verified: boolean; followers_count: number; following_count: number; created_at: string };
-type FeedPost = { id: string; author_id: string; body: string; media_urls: string[]; product_id: string | null; visibility: string; repost_of: string | null; created_at: string; author?: Profile };
+type Post = {
+  id:string; author_id:string; body:string; media_urls:string[]; visibility:string; repost_of:string|null; created_at:string;
+  profile?: {display_name:string;handle:string;avatar_url:string|null;verified:boolean};
+};
 
-const stories = ['Your story', 'Ama’s Corner', 'Nana Glow', 'Esi Styles', 'Hair girls'];
-const tabs = ['For you', 'Following', 'Trending', 'Hair girls'];
-
-function formatAge(value: string) {
-  const seconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
-  if (seconds < 60) return 'now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
+type Story = {id:string;user_id:string;media_url:string;media_type:'image'|'video';caption:string;created_at:string;expires_at:string;profile?:{display_name:string;avatar_url:string|null}};
 
 export default function Community() {
   const router = useRouter();
   const { visibility, onScroll } = useChromeVisibility();
-  const mounted = useRef(true);
-  const [tab, setTab] = useState('For you');
-  const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [followingIds, setFollowingIds] = useState<string[]>([]);
-  const [liked, setLiked] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [tab,setTab]=useState('For you');
+  const [posts,setPosts]=useState<Post[]>([]);
+  const [stories,setStories]=useState<Story[]>([]);
+  const [liked,setLiked]=useState<Set<string>>(new Set());
+  const [bookmarked,setBookmarked]=useState<Set<string>>(new Set());
+  const [following,setFollowing]=useState<Set<string>>(new Set());
+  const [commenting,setCommenting]=useState<string|null>(null);
+  const [comment,setComment]=useState('');
+  const [refreshing,setRefreshing]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
 
-  const loadFeed = useCallback(async (kind: 'initial' | 'refresh' = 'initial') => {
-    if (kind === 'initial') setLoading(true); else setRefreshing(true);
+  const load = useCallback(async () => {
     try {
-      setError(null);
-      const { data: session } = await supabase.auth.getSession();
-      const user = session.session?.user ?? null;
-
-      const { data: rows, error: postsError } = await supabase
-        .from('posts')
-        .select('id, author_id, body, media_urls, product_id, visibility, repost_of, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (postsError) throw postsError;
-
-      const rawPosts = (rows ?? []) as FeedPost[];
-      const authorIds = [...new Set(rawPosts.map(p => p.author_id).filter(Boolean))];
-      let profiles: Profile[] = [];
-      if (authorIds.length) {
-        const { data, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, display_name, handle, bio, avatar_url, verified, followers_count, following_count, created_at')
-          .in('id', authorIds);
-        if (profilesError) throw profilesError;
-        profiles = (data ?? []) as Profile[];
+      setError('');
+      const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await Promise.all([
+        supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(50),
+        supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(50),
+      ]);
+      if (postError) throw postError;
+      if (storyError) throw storyError;
+      const authorIds=[...new Set((rows||[]).map((p:any)=>p.author_id))];
+      const storyUsers=[...new Set((storyRows||[]).map((x:any)=>x.user_id))];
+      const ids=[...new Set([...authorIds,...storyUsers])];
+      const {data: profiles,error: profileError}=ids.length ? await supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',ids) : {data:[],error:null};
+      if (profileError) throw profileError;
+      const map=new Map((profiles||[]).map((p:any)=>[p.id,p]));
+      setPosts((rows||[]).map((p:any)=>({...p,profile:map.get(p.author_id)})));
+      setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
+      const me=await getSessionUser();
+      if (me) {
+        const [ls,bs,fs]=await Promise.all([
+          supabase.from('post_likes').select('post_id').eq('user_id',me.id),
+          supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
+          supabase.from('follows').select('following_id').eq('follower_id',me.id),
+        ]);
+        setLiked(new Set((ls.data||[]).map((x:any)=>x.post_id)));
+        setBookmarked(new Set((bs.data||[]).map((x:any)=>x.post_id)));
+        setFollowing(new Set((fs.data||[]).map((x:any)=>x.following_id)));
       }
+    } catch(e:any) { setError(e?.message || 'Could not load your feed.'); }
+    finally { setLoading(false); setRefreshing(false); }
+  },[]);
 
-      let follows: string[] = [];
-      if (user) {
-        const { data } = await supabase.from('follows').select('following_id').eq('follower_id', user.id);
-        follows = (data ?? []).map(row => row.following_id);
-      }
+  useEffect(()=>{ load(); const channel=supabase.channel('girlies-feed').on('postgres_changes',{event:'*',schema:'public',table:'posts'},()=>load()).on('postgres_changes',{event:'*',schema:'public',table:'stories'},()=>load()).on('postgres_changes',{event:'*',schema:'public',table:'post_likes'},()=>{}).subscribe(); return ()=>{supabase.removeChannel(channel);}; },[load]);
 
-      if (!mounted.current) return;
-      const profileMap = new Map(profiles.map(p => [p.id, p]));
-      setPosts(rawPosts.map(post => ({ ...post, author: profileMap.get(post.author_id) })));
-      setFollowingIds(follows);
-    } catch (e) {
-      if (!mounted.current) return;
-      setError(e instanceof Error ? e.message : 'Unable to load the feed.');
-      if (kind === 'initial') setPosts([]);
-    } finally {
-      if (!mounted.current) return;
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  const onLike=async(id:string)=>{
+    const was=liked.has(id); setLiked(x=>{const n=new Set(x); was?n.delete(id):n.add(id);return n;});
+    try{await togglePostLike(id);}catch(e:any){setLiked(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});Alert.alert('Like failed',e.message);}
+  };
+  const onFollow=async(id:string)=>{
+    const was=following.has(id); setFollowing(x=>{const n=new Set(x);was?n.delete(id):n.add(id);return n;});
+    try{await toggleFollow(id);}catch(e:any){setFollowing(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});Alert.alert('Follow failed',e.message);}
+  };
+  const onBookmark=async(id:string)=>{
+    const was=bookmarked.has(id); setBookmarked(x=>{const n=new Set(x);was?n.delete(id):n.add(id);return n;});
+    try{await toggleBookmark(id);}catch(e:any){setBookmarked(x=>{const n=new Set(x);was?n.add(id):n.delete(id);return n;});}
+  };
+  const sendComment=async(id:string)=>{
+    if(!comment.trim())return;
+    try{await addComment(id,comment);setComment('');setCommenting(null);}catch(e:any){Alert.alert('Comment failed',e.message);}
+  };
 
-  useEffect(() => {
-    mounted.current = true;
-    void loadFeed('initial');
-    const channel = supabase.channel('girlies-community-posts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => void loadFeed('refresh'))
-      .subscribe();
-    return () => {
-      mounted.current = false;
-      void supabase.removeChannel(channel);
-    };
-  }, [loadFeed]);
+  const visiblePosts=useMemo(()=>tab==='Following'?posts.filter(p=>following.has(p.author_id)):posts, [posts,tab,following]);
 
-  const visiblePosts = useMemo(() => {
-    if (tab === 'Following') return posts.filter(p => followingIds.includes(p.author_id));
-    if (tab === 'Trending') return [...posts].sort((a, b) => b.created_at.localeCompare(a.created_at));
-    return posts;
-  }, [posts, followingIds, tab]);
+  return <SafeAreaView style={s.safe}>
+    <Animated.ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{setRefreshing(true);load();}}/>}>
+      <View style={s.top}>
+        <Pressable onPress={()=>router.push('/notifications')} style={s.iconButton}><I name="bell" size={25}/></Pressable>
+        <Text style={s.h}>Feed</Text>
+        <Pressable onPress={()=>router.push('/chat')} style={s.iconButton}><I name="chat" size={25}/></Pressable>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>{['For you','Following','Trending','Hair girls'].map(x=><Pressable key={x} onPress={()=>setTab(x)} style={[s.tab,x===tab&&s.tabOn]}><Text style={[s.tabText,x===tab&&s.tabTextOn]}>{x}</Text></Pressable>)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.stories}>
+        <Pressable style={s.story} onPress={()=>router.push('/story?mode=create')}><View style={[s.storyRing,s.storyOwn]}><Avatar size={58}/><View style={s.add}><Text style={s.addText}>+</Text></View></View><Text style={s.storyName}>Your story</Text></Pressable>
+        {stories.map(st=><Pressable key={st.id} style={s.story} onPress={()=>router.push({pathname:'/story',params:{id:st.id,url:st.media_url,type:st.media_type,name:st.profile?.display_name||'Girlie'}})}>
+          <View style={s.storyRing}><Avatar size={58} /></View><Text style={s.storyName} numberOfLines={1}>{st.profile?.display_name||'Girlie'}</Text>
+        </Pressable>)}
+      </ScrollView>
+      <Pressable style={s.composer} onPress={()=>router.push('/create')}><Avatar size={42}/><View style={s.ask}><Text style={s.askText}>What’s on your mind, girlie?</Text></View><I name="camera" size={24} color={C.pink}/></Pressable>
 
-  const toggleLike = (id: string) => setLiked(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id]);
+      {loading && <View style={s.state}><ActivityIndicator color={C.pink}/><Text style={s.stateText}>Loading your girls…</Text></View>}
+      {!loading && error && <View style={s.state}><Text style={s.stateTitle}>Feed couldn't load</Text><Text style={s.stateText}>{error}</Text><Pressable onPress={load} style={s.retry}><Text style={{color:'#FFF',fontWeight:'900'}}>Try again</Text></Pressable></View>}
+      {!loading && !error && visiblePosts.length===0 && <View style={s.state}><Text style={{fontSize:40}}>✦</Text><Text style={s.stateTitle}>{tab==='Following'?'Follow some girlies':'Your feed is ready'}</Text><Text style={s.stateText}>{tab==='Following'?'Follow people to see their posts here.':'Be the first to share something with the girls.'}</Text></View>}
 
-  return (
-    <SafeAreaView style={s.safe}>
-      <Animated.ScrollView
-        contentContainerStyle={s.scroll}
-        showsVerticalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        refreshing={refreshing}
-        onRefresh={() => void loadFeed('refresh')}
-      >
-        <View style={s.top}>
-          <Pressable onPress={() => router.push('/notifications')} style={s.iconButton} hitSlop={8}>
-            <I name="bell" size={25} /><View style={s.badge}><Text style={s.badgeText}>4</Text></View>
-          </Pressable>
-          <Text style={s.h}>Feed</Text>
-          <Pressable onPress={() => router.push('/chat')} style={s.iconButton} hitSlop={8}><I name="chat" size={25} /></Pressable>
+      {visiblePosts.map(p=><View key={p.id} style={s.post}>
+        <View style={s.postTop}><Avatar size={43}/><View style={{flex:1}}><Text style={s.name}>{p.profile?.display_name||'Girlie'} {p.profile?.verified&&<VerifiedMark size={16}/>}</Text><Text style={s.meta}>@{p.profile?.handle||'girlie'} · {new Date(p.created_at).toLocaleDateString()}</Text></View>
+          {p.author_id!=='' && <Pressable onPress={()=>onFollow(p.author_id)}><Text style={s.follow}>{following.has(p.author_id)?'Following': 'Follow'}</Text></Pressable>}
+          <I name="more" size={21} color={C.muted}/>
         </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>
-          {tabs.map(item => <Pressable key={item} onPress={() => setTab(item)} style={[s.tab, item === tab && s.tabOn]}><Text style={[s.tabText, item === tab && s.tabTextOn]}>{item}</Text></Pressable>)}
-        </ScrollView>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.stories}>
-          {stories.map((story, index) => <Pressable key={story} onPress={() => index === 0 ? router.push('/create') : router.push('/profile')} style={s.story}>
-            <View style={[s.storyRing, index === 0 && s.storyOwn]}><Avatar size={58} index={index} /></View><Text style={s.storyName} numberOfLines={1}>{story}</Text>
-          </Pressable>)}
-        </ScrollView>
-
-        <Pressable style={s.composer} onPress={() => router.push('/create')}>
-          <Avatar size={42}/><View style={s.ask}><Text style={s.askText}>What’s on your mind, girlie?</Text></View><I name="camera" size={24} color={C.pink}/>
-        </Pressable>
-
-        <View style={s.live}>
-          <View style={{ flex: 1, paddingRight: 10 }}><Text style={s.liveK}>LIVE NOW</Text><Text style={s.liveTitle}>Girls are getting ready together</Text><Text style={s.liveText}>Join the community · Beauty Room</Text></View>
-          <Pressable style={s.liveBtn}><Text style={s.liveBtnText}>Watch</Text></Pressable>
+        {!!p.body && <Text style={s.postText}>{p.body}</Text>}
+        {p.media_urls?.map((url,i)=><View key={url+i} style={s.mediaBox}>
+          {url.match(/\.(mp4|mov|m4v|webm)(\?|$)/i) ? <View style={s.video}><I name="camera" size={36} color="#FFF"/><Text style={s.videoText}>VIDEO</Text></View> : <Image source={{uri:url}} style={s.postImg}/>}
+        </View>)}
+        <View style={s.actions}>
+          <View style={s.action}><LikeButton liked={liked.has(p.id)} onPress={()=>onLike(p.id)} size={22}/><Text style={s.actionText}>{liked.has(p.id)?'Liked':'Like'}</Text></View>
+          <Pressable style={s.action} onPress={()=>setCommenting(commenting===p.id?null:p.id)}><I name="chat" size={20}/><Text style={s.actionText}>Comment</Text></Pressable>
+          <Pressable style={s.action}><I name="share" size={20}/><Text style={s.actionText}>Share</Text></Pressable>
+          <Pressable style={s.action} onPress={()=>onBookmark(p.id)}><I name="bookmark" size={20} filled={bookmarked.has(p.id)}/></Pressable>
         </View>
-
-        {error ? <View style={s.errorBox}><Text style={s.errorTitle}>We couldn’t load new posts</Text><Text style={s.errorText}>{error}</Text><Pressable style={s.retry} onPress={() => void loadFeed('refresh')}><Text style={s.retryText}>Try again</Text></Pressable></View> : null}
-
-        {loading ? <View style={s.loadingBox}><ActivityIndicator color={C.pink}/><Text style={s.loadingText}>Loading the girls’ feed…</Text></View> : visiblePosts.length ? visiblePosts.map((post, index) => {
-          const author = post.author;
-          const media = Array.isArray(post.media_urls) ? post.media_urls.filter(url => /^https?:\/\//i.test(url)) : [];
-          const isLiked = liked.includes(post.id);
-          return <View key={post.id} style={s.post}>
-            <View style={s.postTop}><Avatar size={43}/><View style={s.authorBlock}><View style={s.nameRow}><Text style={s.name} numberOfLines={1}>{author?.display_name || 'Girlies member'}</Text>{author?.verified ? <VerifiedMark size={16}/> : null}</View><Text style={s.meta}>{author?.handle ? `@${author.handle} · ` : ''}{formatAge(post.created_at)}</Text></View><I name="more" size={21} color={C.muted}/></View>
-            {!!post.body && <Text style={s.postText}>{post.body}</Text>}
-            {media.length ? <Image source={{uri: media[0]}} style={s.postImg}/> : <View style={[s.textPost, index % 3 === 1 && {backgroundColor: C.lilac}, index % 3 === 2 && {backgroundColor: C.sun}]}><Text style={s.textPostLabel}>GIRLIES COMMUNITY</Text><Text style={s.textPostCopy}>{post.body || 'New post from the community.'}</Text></View>}
-            <View style={s.actions}><View style={s.action}><LikeButton liked={isLiked} onPress={() => toggleLike(post.id)} size={22}/><Text style={s.actionText}>{isLiked ? 1 : 0}</Text></View><Pressable style={s.action}><I name="chat" size={20}/><Text style={s.actionText}>Comment</Text></Pressable><Pressable style={s.action}><I name="share" size={20}/><Text style={s.actionText}>Share</Text></Pressable><Pressable style={s.action}><I name="bookmark" size={20}/></Pressable></View>
-          </View>;
-        }) : <View style={s.empty}><View style={s.emptyIcon}><I name="spark" size={28} color={C.pink}/></View><Text style={s.emptyTitle}>{tab === 'Following' ? 'Nothing from your girls yet' : 'The feed is ready for you'}</Text><Text style={s.emptyText}>{tab === 'Following' ? 'Follow a few girlies and their posts will appear here.' : 'Be the first to start a conversation with the community.'}</Text><Pressable style={s.emptyButton} onPress={() => router.push('/create')}><I name="plus" size={19} color="#FFF"/><Text style={s.emptyButtonText}>Create a post</Text></Pressable></View>}
-        <View style={{height: 18}}/>
-      </Animated.ScrollView>
-
-      <Animated.View pointerEvents="box-none" style={[s.fabWrap, { transform: [{ translateY: visibility.interpolate({ inputRange: [0,1], outputRange: [90,0] }) }] }]}>
-        <Pressable style={s.fab} onPress={() => router.push('/create')}><I name="plus" size={28} color="#FFF"/></Pressable>
-      </Animated.View>
-    </SafeAreaView>
-  );
+        {commenting===p.id&&<View style={s.commentBox}><TextInput value={comment} onChangeText={setComment} placeholder="Write a comment…" placeholderTextColor={C.muted} style={s.commentInput}/><Pressable onPress={()=>sendComment(p.id)}><I name="send" size={22} color={C.pink}/></Pressable></View>}
+      </View>)}
+    </Animated.ScrollView>
+    <Pressable style={[s.fab,{transform:[{translateY:visibility.interpolate({inputRange:[0,1],outputRange:[90,0]})}]}]} onPress={()=>router.push('/create')}><I name="plus" size={28} color="#FFF"/></Pressable>
+  </SafeAreaView>;
 }
 
-export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
-  return <SafeAreaView style={s.safe}><View style={s.routeError}><View style={s.emptyIcon}><I name="spark" size={28} color={C.pink}/></View><Text style={s.emptyTitle}>Feed hit a snag</Text><Text style={s.errorText}>{error.message}</Text><Pressable style={s.emptyButton} onPress={retry}><Text style={s.emptyButtonText}>Retry Feed</Text></Pressable></View></SafeAreaView>;
-}
-
-const s = StyleSheet.create({
-  safe:{flex:1,backgroundColor:C.bg}, scroll:{padding:18,paddingBottom:120}, top:{height:54,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, h:{fontSize:20,fontWeight:'900',color:C.ink}, iconButton:{padding:5}, badge:{position:'absolute',top:-3,right:-4,width:18,height:18,borderRadius:9,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:C.bg}, badgeText:{color:'#FFF',fontSize:10,fontWeight:'900'}, tabScroll:{marginBottom:12}, tab:{paddingHorizontal:14,paddingVertical:9,borderRadius:18,backgroundColor:'#FFF',marginRight:7,borderWidth:1,borderColor:C.line}, tabOn:{backgroundColor:C.ink}, tabText:{fontSize:11,fontWeight:'900',color:C.ink}, tabTextOn:{color:'#FFF'}, stories:{marginBottom:14}, story:{width:74,alignItems:'center',marginRight:8}, storyRing:{padding:3,borderRadius:36,borderWidth:2,borderColor:C.pink}, storyOwn:{borderColor:C.ink}, storyName:{fontSize:10,color:C.ink,marginTop:5}, composer:{backgroundColor:'#FFF',borderRadius:28,padding:13,flexDirection:'row',alignItems:'center',gap:10,borderWidth:1,borderColor:C.line}, ask:{flex:1,paddingHorizontal:12}, askText:{color:C.muted,fontWeight:'600'}, live:{marginTop:15,borderRadius:28,padding:18,backgroundColor:C.coral,flexDirection:'row',alignItems:'center',justifyContent:'space-between'}, liveK:{fontSize:9,fontWeight:'900',letterSpacing:1.2,color:C.ink}, liveTitle:{fontSize:18,fontWeight:'900',marginTop:5,color:C.ink}, liveText:{fontSize:12,fontWeight:'600',marginTop:4,color:C.ink}, liveBtn:{backgroundColor:C.ink,paddingHorizontal:14,paddingVertical:10,borderRadius:18}, liveBtnText:{color:'#FFF',fontWeight:'900'}, errorBox:{marginTop:15,backgroundColor:'#FFF',borderRadius:22,padding:16,borderWidth:1,borderColor:C.line}, errorTitle:{fontSize:14,fontWeight:'900',color:C.ink,textAlign:'center'}, errorText:{fontSize:12,lineHeight:18,color:C.muted,textAlign:'center',marginTop:6}, retry:{alignSelf:'center',marginTop:12,backgroundColor:C.ink,paddingHorizontal:16,paddingVertical:9,borderRadius:17}, retryText:{color:'#FFF',fontWeight:'900',fontSize:12}, loadingBox:{minHeight:150,alignItems:'center',justifyContent:'center',gap:10}, loadingText:{fontSize:12,color:C.muted,fontWeight:'700'}, empty:{marginTop:15,backgroundColor:'#FFF',borderRadius:30,padding:25,alignItems:'center',borderWidth:1,borderColor:C.line}, emptyIcon:{width:58,height:58,borderRadius:29,backgroundColor:C.rose,alignItems:'center',justifyContent:'center',marginBottom:13}, emptyTitle:{fontSize:18,fontWeight:'900',color:C.ink,textAlign:'center'}, emptyText:{fontSize:12,lineHeight:18,color:C.muted,textAlign:'center',marginTop:7,maxWidth:290}, emptyButton:{marginTop:17,backgroundColor:C.pink,borderRadius:21,paddingHorizontal:17,paddingVertical:11,flexDirection:'row',alignItems:'center',gap:7}, emptyButtonText:{color:'#FFF',fontSize:12,fontWeight:'900'}, textPost:{minHeight:190,borderRadius:23,backgroundColor:C.mint,padding:22,justifyContent:'flex-end'}, textPostLabel:{fontSize:9,letterSpacing:1.3,fontWeight:'900',color:C.ink}, textPostCopy:{fontSize:17,lineHeight:23,fontWeight:'900',color:C.ink,marginTop:8}, post:{marginTop:15,backgroundColor:'#FFF',borderRadius:29,padding:15,borderWidth:1,borderColor:C.line}, postTop:{flexDirection:'row',alignItems:'center',gap:10}, authorBlock:{flex:1}, nameRow:{flexDirection:'row',alignItems:'center',gap:5,minWidth:0}, name:{fontSize:14,fontWeight:'900',color:C.ink,flexShrink:1}, meta:{fontSize:11,color:C.muted,marginTop:2}, postText:{fontSize:14,lineHeight:20,fontWeight:'600',color:C.ink,marginVertical:12}, postImg:{height:285,borderRadius:23,width:'100%',backgroundColor:C.line}, actions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingTop:12}, action:{flexDirection:'row',alignItems:'center',gap:5,minWidth:36}, actionText:{fontSize:11,color:C.ink}, fabWrap:{position:'absolute',right:23,bottom:92,zIndex:18}, fab:{width:55,height:55,borderRadius:28,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',elevation:8}, routeError:{flex:1,alignItems:'center',justifyContent:'center',padding:28}
+const s=StyleSheet.create({
+safe:{flex:1,backgroundColor:C.bg},scroll:{padding:18,paddingBottom:105},top:{height:54,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},h:{fontSize:20,fontWeight:'900'},iconButton:{padding:5},
+tabScroll:{marginBottom:12},tab:{paddingHorizontal:14,paddingVertical:9,borderRadius:18,backgroundColor:'#FFF',marginRight:7,borderWidth:1,borderColor:C.line},tabOn:{backgroundColor:C.ink},tabText:{fontSize:11,fontWeight:'900',color:C.ink},tabTextOn:{color:'#FFF'},
+stories:{marginBottom:14},story:{width:76,alignItems:'center',marginRight:8},storyRing:{padding:3,borderRadius:36,borderWidth:2,borderColor:C.pink,position:'relative'},storyOwn:{borderColor:C.ink},storyName:{fontSize:10,color:C.ink,marginTop:5},add:{position:'absolute',right:-1,bottom:0,width:20,height:20,borderRadius:10,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#FFF'},addText:{color:'#FFF',fontWeight:'900'},
+composer:{backgroundColor:'#FFF',borderRadius:28,padding:13,flexDirection:'row',alignItems:'center',gap:10,borderWidth:1,borderColor:C.line},ask:{flex:1,paddingHorizontal:12},askText:{color:C.muted,fontWeight:'600'},
+state:{marginTop:18,padding:28,borderRadius:28,backgroundColor:'#FFF',alignItems:'center',borderWidth:1,borderColor:C.line},stateTitle:{fontSize:18,fontWeight:'900',marginTop:6},stateText:{fontSize:12,color:C.muted,textAlign:'center',lineHeight:17,marginTop:5},retry:{marginTop:14,paddingHorizontal:18,paddingVertical:10,borderRadius:20,backgroundColor:C.pink},
+post:{marginTop:15,backgroundColor:'#FFF',borderRadius:29,padding:15,borderWidth:1,borderColor:C.line},postTop:{flexDirection:'row',alignItems:'center',gap:10},name:{fontSize:14,fontWeight:'900'},meta:{fontSize:11,color:C.muted,marginTop:2},follow:{color:C.pink,fontSize:12,fontWeight:'900',marginRight:5},postText:{fontSize:14,lineHeight:20,fontWeight:'600',marginVertical:12},mediaBox:{marginTop:5},postImg:{height:285,borderRadius:23,width:'100%'},video:{height:285,borderRadius:23,backgroundColor:C.plum,alignItems:'center',justifyContent:'center'},videoText:{color:'#FFF',fontWeight:'900',marginTop:6},
+actions:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingTop:12},action:{flexDirection:'row',alignItems:'center',gap:5,minWidth:36},actionText:{fontSize:12,color:C.ink},commentBox:{marginTop:10,padding:8,borderRadius:22,backgroundColor:C.bg,flexDirection:'row',alignItems:'center'},commentInput:{flex:1,paddingHorizontal:10,paddingVertical:8},fab:{position:'absolute',right:23,bottom:92,width:55,height:55,borderRadius:28,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',zIndex:18,elevation:8}
 });
