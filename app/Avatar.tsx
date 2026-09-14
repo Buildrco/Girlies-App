@@ -1,3 +1,18 @@
-import React from 'react';import{View,Image,Text}from'react-native';
-const pics=['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=85','https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=85','https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=300&q=85'];
-export function Avatar({size=48,index=0,verified=false}:{size?:number,index?:number,verified?:boolean}){return <View style={{width:size,height:size,borderRadius:size/2,overflow:'visible'}}><Image source={{uri:pics[index%pics.length]}} style={{width:size,height:size,borderRadius:size/2}}/><View style={{position:'absolute',right:-1,bottom:-1,width:Math.max(16,size*.32),height:Math.max(16,size*.32),borderRadius:20,backgroundColor:'#1877F2',alignItems:'center',justifyContent:'center',borderWidth:2,borderColor:'#FFF'}}><Text style={{color:'#FFF',fontSize:Math.max(9,size*.14),fontWeight:'900'}}>✓</Text></View></View>}
+import React from 'react';
+import { View, Image } from 'react-native';
+import { C } from './constants/theme';
+import { I } from './components/Icons';
+
+const pics = ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=85', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=300&q=85', 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=300&q=85'];
+
+export function VerifiedMark({ size = 18 }: { size?: number }) {
+  return <I name="verified" size={size} color={C.pink} />;
+}
+
+export function Avatar({ size = 48, index = 0, verified = false }: { size?: number; index?: number; verified?: boolean }) {
+  const badgeSize = Math.max(16, size * 0.32);
+  return <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'visible' }}>
+    <Image source={{ uri: pics[index % pics.length] }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+    {verified && <View style={{ position: 'absolute', right: -4, bottom: -4, width: badgeSize + 4, height: badgeSize + 4, borderRadius: 20, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}><VerifiedMark size={badgeSize} /></View>}
+  </View>;
+}
