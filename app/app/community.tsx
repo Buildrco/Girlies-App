@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, FlatList, Image, InteractionManager, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -34,10 +34,9 @@ export default function Community() {
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const loadingRef=useRef(false);
-  const mountedRef=useRef(true);
+  const mountedRef=useRef(false);
   const focusedRef=useRef(false);
-  const focusIdRef=useRef(0);
-  const loadRequestRef=useRef(0);
+  const focusGenerationRef=useRef(0);
   const likedRef=useRef(new Set<string>());
   const bookmarkedRef=useRef(new Set<string>());
   const followingRef=useRef(new Set<string>());
@@ -51,105 +50,165 @@ export default function Community() {
     promise.then(value=>{clearTimeout(timer);resolve(value);},reason=>{clearTimeout(timer);reject(reason);});
   }),[]);
 
-  const load = useCallback(async () => {
-    if (loadingRef.current || !focusedRef.current) return;
-    loadingRef.current=true;
-    const requestId=++loadRequestRef.current;
-    const focusId=focusIdRef.current;
-    const isCurrent=()=>mountedRef.current&&focusedRef.current&&focusIdRef.current===focusId;
+  const isCurrentFocus = useCallback((generation:number) => (
+    mountedRef.current && focusedRef.current && focusGenerationRef.current === generation
+  ),[]);
+
+  const loadPostProfiles = useCallback(async (postRows:any[], generation:number) => {
+    const authorIds=[...new Set(postRows.map(p=>p.author_id))];
+    if (!authorIds.length) return;
     try {
-      setError('');
-      const [{data: rows,error: postError},{data: storyRows,error: storyError}] = await withTimeout(Promise.all([
-        supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(20),
-        supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(20),
-      ]));
-      if (postError) throw postError;
-      if (storyError) throw storyError;
-      const authorIds=[...new Set((rows||[]).map((p:any)=>p.author_id))];
-      const storyUsers=[...new Set((storyRows||[]).map((x:any)=>x.user_id))];
-      const ids=[...new Set([...authorIds,...storyUsers])];
-      const postIds=(rows||[]).map((p:any)=>p.id);
-      const [{data: profiles,error: profileError},{data: postLikeRows,error: likeError}]=await withTimeout(Promise.all([
-        ids.length ? supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',ids) : Promise.resolve({data:[],error:null}),
-        postIds.length ? supabase.from('post_likes').select('post_id').in('post_id',postIds) : Promise.resolve({data:[],error:null}),
-      ]));
-      if (profileError) throw profileError;
-      if (likeError) throw likeError;
-      const map=new Map((profiles||[]).map((p:any)=>[p.id,p]));
-      const counts=(postLikeRows||[]).reduce((result:any,row:any)=>{
+      const {data,error}=await withTimeout(Promise.resolve(supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id',authorIds)));
+      if (error) throw error;
+      if (!isCurrentFocus(generation)) return;
+      const map=new Map((data||[]).map((p:any)=>[p.id,p]));
+      setPosts(current=>current.map(post=>({...post,profile:map.get(post.author_id)||post.profile})));
+    } catch(e) {
+      console.warn('[Community] post profiles unavailable',e);
+    }
+  },[isCurrentFocus,withTimeout]);
+
+  const loadStories = useCallback(async (generation:number) => {
+    try {
+      const {data,error}=await withTimeout(Promise.resolve(supabase.from('stories').select('id,user_id,media_url,media_type,caption,created_at,expires_at').gt('expires_at',new Date().toISOString()).order('created_at',{ascending:false}).limit(20)));
+      if (error) throw error;
+      if (!isCurrentFocus(generation)) return;
+      const storyRows=data||[];
+      setStories(storyRows.map((story:any)=>({...story,profile:undefined})));
+      const storyUsers=[...new Set(storyRows.map((story:any)=>story.user_id))];
+      if (!storyUsers.length) return;
+      const profileResult=await withTimeout(Promise.resolve(supabase.from('profiles').select('id,display_name,avatar_url').in('id',storyUsers)));
+      if (profileResult.error) throw profileResult.error;
+      if (!isCurrentFocus(generation)) return;
+      const map=new Map((profileResult.data||[]).map((profile:any)=>[profile.id,profile]));
+      setStories(current=>current.map(story=>({...story,profile:map.get(story.user_id)||story.profile})));
+    } catch(e) {
+      console.warn('[Community] stories unavailable',e);
+    }
+  },[isCurrentFocus,withTimeout]);
+
+  const loadLikeCounts = useCallback(async (postRows:any[], generation:number) => {
+    const postIds=postRows.map(post=>post.id);
+    if (!postIds.length) return;
+    try {
+      const {data,error}=await withTimeout(Promise.resolve(supabase.from('post_likes').select('post_id').in('post_id',postIds)));
+      if (error) throw error;
+      if (!isCurrentFocus(generation)) return;
+      const counts=(data||[]).reduce((result:any,row:any)=>{
         result[row.post_id]=(result[row.post_id]||0)+1;
         return result;
       },{} as Record<string,number>);
-      const me=await getSessionUser();
-      let likeRows:any[]=[];
-      let bookmarkRows:any[]=[];
-      let followRows:any[]=[];
-      if (me) {
-        const [ls,bs,fs]=await withTimeout(Promise.all([
-          supabase.from('post_likes').select('post_id').eq('user_id',me.id),
-          supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
-          supabase.from('follows').select('following_id').eq('follower_id',me.id),
-        ]));
-        if (ls.error) throw ls.error;
-        if (bs.error) throw bs.error;
-        if (fs.error) throw fs.error;
-        likeRows=ls.data||[];
-        bookmarkRows=bs.data||[];
-        followRows=fs.data||[];
-      }
-      if (!isCurrent()) return;
-      setPosts((rows||[]).map((p:any)=>({...p,media_urls:p.media_urls||[],like_count:counts[p.id]||0,profile:map.get(p.author_id)})));
-      setStories((storyRows||[]).map((x:any)=>({...x,profile:map.get(x.user_id)})));
       setLikeCounts(counts);
-      if (me) {
-        const fetchedLiked=new Set(likeRows.map((x:any)=>x.post_id));
-        const fetchedBookmarked=new Set(bookmarkRows.map((x:any)=>x.post_id));
-        const fetchedFollowing=new Set(followRows.map((x:any)=>x.following_id));
-        likeDesiredRef.current.forEach((value,id)=>value?fetchedLiked.add(id):fetchedLiked.delete(id));
-        bookmarkDesiredRef.current.forEach((value,id)=>value?fetchedBookmarked.add(id):fetchedBookmarked.delete(id));
-        followDesiredRef.current.forEach((value,id)=>value?fetchedFollowing.add(id):fetchedFollowing.delete(id));
-        likedRef.current=fetchedLiked;
-        bookmarkedRef.current=fetchedBookmarked;
-        followingRef.current=fetchedFollowing;
-        setLiked(new Set(fetchedLiked));
-        setBookmarked(new Set(fetchedBookmarked));
-        setFollowing(new Set(fetchedFollowing));
-      } else {
+      setPosts(current=>current.map(post=>({...post,like_count:counts[post.id]||0})));
+    } catch(e) {
+      console.warn('[Community] like counts unavailable',e);
+    }
+  },[isCurrentFocus,withTimeout]);
+
+  const loadUserState = useCallback(async (generation:number) => {
+    try {
+      const me=await getSessionUser();
+      if (!me) {
+        if (!isCurrentFocus(generation)) return;
         likedRef.current=new Set();
         bookmarkedRef.current=new Set();
         followingRef.current=new Set();
         setLiked(new Set());
         setBookmarked(new Set());
         setFollowing(new Set());
+        return;
       }
-    } catch(e:any) { if (isCurrent()) setError(e?.message || 'Could not load your feed.'); }
-    finally {
-      if (loadRequestRef.current===requestId) loadingRef.current=false;
-      if (isCurrent()) { setLoading(false); setRefreshing(false); }
+      const [likeResult,bookmarkResult,followResult]=await withTimeout(Promise.all([
+        supabase.from('post_likes').select('post_id').eq('user_id',me.id),
+        supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
+        supabase.from('follows').select('following_id').eq('follower_id',me.id),
+      ]));
+      if (likeResult.error) throw likeResult.error;
+      if (bookmarkResult.error) throw bookmarkResult.error;
+      if (followResult.error) throw followResult.error;
+      if (!isCurrentFocus(generation)) return;
+      const fetchedLiked=new Set((likeResult.data||[]).map((row:any)=>row.post_id));
+      const fetchedBookmarked=new Set((bookmarkResult.data||[]).map((row:any)=>row.post_id));
+      const fetchedFollowing=new Set((followResult.data||[]).map((row:any)=>row.following_id));
+      likeDesiredRef.current.forEach((value,id)=>value?fetchedLiked.add(id):fetchedLiked.delete(id));
+      bookmarkDesiredRef.current.forEach((value,id)=>value?fetchedBookmarked.add(id):fetchedBookmarked.delete(id));
+      followDesiredRef.current.forEach((value,id)=>value?fetchedFollowing.add(id):fetchedFollowing.delete(id));
+      likedRef.current=fetchedLiked;
+      bookmarkedRef.current=fetchedBookmarked;
+      followingRef.current=fetchedFollowing;
+      setLiked(new Set(fetchedLiked));
+      setBookmarked(new Set(fetchedBookmarked));
+      setFollowing(new Set(fetchedFollowing));
+    } catch(e) {
+      console.warn('[Community] user interaction state unavailable',e);
     }
-  },[withTimeout]);
+  },[isCurrentFocus,withTimeout]);
+
+  const hydrateCommunity = useCallback((postRows:any[], generation:number) => {
+    void loadPostProfiles(postRows,generation);
+    void loadStories(generation);
+    void loadLikeCounts(postRows,generation);
+    void loadUserState(generation);
+  },[loadLikeCounts,loadPostProfiles,loadStories,loadUserState]);
+
+  const load = useCallback(async () => {
+    if (loadingRef.current || !focusedRef.current) return;
+    const generation=focusGenerationRef.current;
+    loadingRef.current=true;
+    setLoading(true);
+    setError('');
+    try {
+      const {data,error:postError}=await withTimeout(Promise.resolve(
+        supabase.from('posts').select('id,author_id,body,media_urls,visibility,repost_of,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(20)
+      ));
+      if (postError) throw postError;
+      if (!isCurrentFocus(generation)) return;
+      const nextPosts=(data||[]).map((post:any)=>({...post,media_urls:post.media_urls||[]}));
+      setPosts(nextPosts);
+      setLoading(false);
+      hydrateCommunity(nextPosts,generation);
+    } catch(e:any) {
+      if (isCurrentFocus(generation)) setError(e?.message||'Could not load your feed.');
+    } finally {
+      if (focusGenerationRef.current===generation) loadingRef.current=false;
+      if (isCurrentFocus(generation)) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  },[hydrateCommunity,isCurrentFocus,withTimeout]);
 
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
-    focusIdRef.current+=1;
-    const task=InteractionManager.runAfterInteractions(()=>{ if (focusedRef.current) void load(); });
+    focusGenerationRef.current+=1;
+    void load();
     return () => {
-      task.cancel();
       focusedRef.current=false;
       mountedRef.current=false;
-      focusIdRef.current+=1;
+      focusGenerationRef.current+=1;
       loadingRef.current=false;
     };
-  }, [load]));
+  },[load]));
+
   useEffect(()=> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const scheduleLoad=()=>{ if (!focusedRef.current) return; if (timer) clearTimeout(timer); timer=setTimeout(load,350); };
+    const scheduleLoad=()=>{
+      if (!focusedRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer=setTimeout(()=>{
+        timer=undefined;
+        void load();
+      },350);
+    };
     const channel=supabase.channel('girlies-feed')
       .on('postgres_changes',{event:'*',schema:'public',table:'posts'},scheduleLoad)
       .on('postgres_changes',{event:'*',schema:'public',table:'stories'},scheduleLoad)
       .subscribe();
-    return ()=>{ if (timer) clearTimeout(timer); supabase.removeChannel(channel); };
+    return ()=>{
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   },[load]);
 
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
@@ -287,7 +346,7 @@ export default function Community() {
         {commenting===p.id&&<View style={s.commentBox}><TextInput value={comment} onChangeText={setComment} placeholder="Write a comment…" placeholderTextColor={C.muted} style={s.commentInput}/><Pressable onPress={()=>sendComment(p.id)}><I name="send" size={22} color={C.pink}/></Pressable></View>}
       </View>;
   return <SafeAreaView style={s.safe}>
-    <Animated.FlatList
+    <FlatList
       data={visiblePosts}
       renderItem={renderPost}
       keyExtractor={item=>item.id}
@@ -298,7 +357,6 @@ export default function Community() {
       onScroll={onScroll}
       scrollEventThrottle={16}
        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={()=>{if(!loadingRef.current){setRefreshing(true);void load();}}}/>}
-      removeClippedSubviews
       initialNumToRender={5}
       maxToRenderPerBatch={5}
       windowSize={5}
