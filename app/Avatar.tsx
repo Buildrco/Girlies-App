@@ -9,8 +9,8 @@ export function VerifiedMark({ size = 18 }: { size?: number }) {
   return <I name="verified" size={size} color={C.pink} />;
 }
 
-export function Avatar({ size = 48, index = 0, verified = false }: { size?: number; index?: number; verified?: boolean }) {
+export function Avatar({ size = 48, index = 0, uri, verified: _verified }: { size?: number; index?: number; uri?: string | null; verified?: boolean }) {
   return <View style={{ width: size, height: size, borderRadius: size / 2, overflow: 'visible' }}>
-    <Image source={{ uri: pics[index % pics.length] }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+    <Image source={{ uri: uri || pics[index % pics.length] }} style={{ width: size, height: size, borderRadius: size / 2 }} />
   </View>;
 }
