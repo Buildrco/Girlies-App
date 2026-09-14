@@ -16,10 +16,12 @@ create table if not exists story_views(story_id uuid not null references stories
 create table if not exists post_likes(post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, created_at timestamptz default now(), primary key(post_id,user_id));
 create table if not exists post_comments(id uuid primary key default gen_random_uuid(), post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, parent_id uuid references post_comments(id) on delete cascade, body text not null, created_at timestamptz default now());
 create table if not exists bookmarks(post_id uuid not null references posts(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, created_at timestamptz default now(), primary key(post_id,user_id));
+create table if not exists product_likes(product_id uuid not null references products(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, created_at timestamptz default now(), primary key(product_id,user_id));
 create index if not exists stories_expiry_idx on stories(expires_at);
 create index if not exists post_likes_user_idx on post_likes(user_id);
 create index if not exists post_comments_post_idx on post_comments(post_id,created_at);
 create index if not exists bookmarks_user_idx on bookmarks(user_id);
+create index if not exists product_likes_user_idx on product_likes(user_id);
 
 alter table profiles enable row level security;
 alter table posts enable row level security;
@@ -29,6 +31,7 @@ alter table story_views enable row level security;
 alter table post_likes enable row level security;
 alter table post_comments enable row level security;
 alter table bookmarks enable row level security;
+alter table product_likes enable row level security;
 
 drop policy if exists profiles_read on profiles;
 create policy profiles_read on profiles for select using (true);
@@ -80,6 +83,12 @@ drop policy if exists bookmarks_insert_own on bookmarks;
 create policy bookmarks_insert_own on bookmarks for insert with check (auth.uid() = user_id);
 drop policy if exists bookmarks_delete_own on bookmarks;
 create policy bookmarks_delete_own on bookmarks for delete using (auth.uid() = user_id);
+drop policy if exists product_likes_read on product_likes;
+create policy product_likes_read on product_likes for select using (true);
+drop policy if exists product_likes_insert_own on product_likes;
+create policy product_likes_insert_own on product_likes for insert with check (auth.uid() = user_id);
+drop policy if exists product_likes_delete_own on product_likes;
+create policy product_likes_delete_own on product_likes for delete using (auth.uid() = user_id);
 
 create or replace function update_profile_follow_counts() returns trigger language plpgsql security definer set search_path = public as $$
 begin
