@@ -3,14 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
-const publishableKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-
-if (!url || !publishableKey) {
-  throw new Error(
-    'Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY before starting the app.',
-  );
-}
+const url = (process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://kmfkafncpwmjnraumiwq.supabase.co').trim();
+const publishableKey = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_RsX1yDwyp7C4jIkdCe0VqA_05tMgdHY').trim();
 
 // This is the public client key intended for mobile apps. Never use service_role here.
 export const supabase: SupabaseClient = createClient(url, publishableKey, {
