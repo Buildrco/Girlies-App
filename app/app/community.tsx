@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, InteractionManager, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -44,6 +44,7 @@ export default function Community() {
   const followDesiredRef=useRef(new Map<string,boolean>());
   const bookmarkDesiredRef=useRef(new Map<string,boolean>());
   const mutationQueuesRef=useRef(new Map<string,Promise<void>>());
+  const loadRef=useRef<()=>Promise<void>>(() => Promise.resolve());
 
   const withTimeout = useCallback(<T,>(promise: Promise<T>, ms=8000) => new Promise<T>((resolve,reject) => {
     const timer=setTimeout(()=>reject(new Error('Feed request timed out. Check your connection and try again.')),ms);
@@ -161,7 +162,9 @@ export default function Community() {
       const nextPosts=(data||[]).map((post:any)=>({...post,media_urls:post.media_urls||[]}));
       setPosts(nextPosts);
       setLoading(false);
-      if (isCurrentFocus(generation)) void hydrateCommunity(nextPosts,generation);
+      InteractionManager.runAfterInteractions(() => {
+        if (isCurrentFocus(generation)) void hydrateCommunity(nextPosts,generation);
+      });
     } catch(e:any) {
       if (isCurrentFocus(generation)) setError(e?.message||'Could not load your feed.');
     } finally {
@@ -173,20 +176,23 @@ export default function Community() {
     }
   },[hydrateCommunity,isCurrentFocus,withTimeout]);
 
+  loadRef.current=load;
+
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
     reset();
     focusGenerationRef.current+=1;
-    void load();
+    const interactionTask = InteractionManager.runAfterInteractions(() => { void loadRef.current(); });
     return () => {
+      interactionTask.cancel();
       reset();
       focusedRef.current=false;
       mountedRef.current=false;
       focusGenerationRef.current+=1;
       loadingRef.current=false;
     };
-  },[load,reset]));
+  },[reset]));
 
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
     const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
