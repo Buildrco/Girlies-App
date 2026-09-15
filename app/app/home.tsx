@@ -14,6 +14,15 @@ import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { getPostLikeState, getSessionUser, setFollow, setPostLike } from '../lib/social';
 
+type HomePost = {
+  id: string;
+  author_id: string;
+  body: string;
+  media_urls: string[];
+  created_at: string;
+  profile?: { display_name: string; handle: string; avatar_url: string | null; verified: boolean };
+};
+
 const imgs = [
   'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1000&q=85',
   'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=85',
@@ -32,8 +41,11 @@ export default function Home() {
   const [followingBusy, setFollowingBusy] = useState<Set<number>>(new Set());
   const [productIds, setProductIds] = useState<string[]>([]);
   const [homePostId, setHomePostId] = useState<string | null>(null);
+  const [homePost, setHomePost] = useState<HomePost | null>(null);
   const [liked, setLiked] = useState(false);
   const [homeLikeCount, setHomeLikeCount] = useState<number | null>(null);
+  const [homeCommentCount, setHomeCommentCount] = useState(0);
+  const [homeShareCount, setHomeShareCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
   const sellers = ['Nia Hair', 'Amara Beauty', 'Glow Room', 'The Bag Edit', 'Scent Lab'];
 
@@ -47,7 +59,7 @@ export default function Home() {
         const [profilesResult, productsResult, postResult] = await Promise.all([
           supabase.from('profiles').select('id').order('created_at', { ascending: true }).limit(sellers.length),
           supabase.from('products').select('id').order('created_at', { ascending: false }).limit(sellers.length),
-          supabase.from('posts').select('id').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
+          supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
         ]);
         if (profilesResult.error) throw profilesResult.error;
         if (productsResult.error) throw productsResult.error;
@@ -55,26 +67,39 @@ export default function Home() {
         const liveSellerIds = (profilesResult.data || []).map(row => row.id);
         setSellerIds(liveSellerIds);
         setProductIds((productsResult.data || []).map(row => row.id));
-        const postId = postResult.data?.[0]?.id || null;
+        const post = postResult.data?.[0] || null;
+        const postId = post?.id || null;
         setHomePostId(postId);
-        if (!me || !postId) {
+        if (!post) {
+          setHomePost(null);
           setFollowed(new Set());
           setLiked(false);
-          setHomeLikeCount(postId ? 0 : null);
+          setHomeLikeCount(null);
+          setHomeCommentCount(0);
+          setHomeShareCount(0);
           return;
         }
-        const [followResult, likeResult, countResult] = await Promise.all([
-          supabase.from('follows').select('following_id').eq('follower_id', me.id),
+        const [profileResult, followResult, likeResult, countResult, commentsResult, sharesResult] = await Promise.all([
+          supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle(),
+          me ? supabase.from('follows').select('following_id').eq('follower_id', me.id) : Promise.resolve({ data: [], error: null }),
           getPostLikeState(postId),
           supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId),
+          supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId),
+          supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId),
         ]);
+        if (profileResult.error) throw profileResult.error;
         if (followResult.error) throw followResult.error;
         if (countResult.error) throw countResult.error;
+        if (commentsResult.error) throw commentsResult.error;
+        if (sharesResult.error) throw sharesResult.error;
         if (!active) return;
+        setHomePost({ ...post, media_urls: post.media_urls || [], profile: profileResult.data || undefined });
         const followedIds = new Set((followResult.data || []).map(row => row.following_id));
         setFollowed(new Set(liveSellerIds.map((id, index) => followedIds.has(id) ? index : -1).filter(index => index >= 0)));
         setLiked(likeResult);
         setHomeLikeCount(countResult.count || 0);
+        setHomeCommentCount(commentsResult.count || 0);
+        setHomeShareCount(sharesResult.count || 0);
       } catch (error) {
         if (active) Alert.alert('Could not load live activity', error instanceof Error ? error.message : 'Please try again.');
       }
@@ -128,7 +153,7 @@ export default function Home() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>{['Silk press wig', 'Rose oud perfume', 'Everyday tote', 'Glow kit', 'Satin set'].map((name, index) => <ProductCard key={name} productId={productIds[index]} name={name} price={'GH₵ ' + [480, 320, 260, 190, 150][index]} image={imgs[(index + 1) % imgs.length]} seller={['Nia Hair', 'Scent Lab', 'Amara Store', 'Glow Room', 'Nia Closet'][index]} onPress={() => router.push({ pathname: '/product', params: { id: String(index) } })} />)}</ScrollView>
       <View style={s.editorial}><Image source={{ uri: imgs[3] }} style={s.editorialImg} /><View style={s.editorialText}><Text style={s.editorialK}>THE GIRLIE GUIDE</Text><Text style={s.editorialTitle}>Good taste is better when shared.</Text><Text style={s.editorialSub}>Save a look. Ask the community. Find the shop. Make it yours.</Text><Pressable onPress={() => router.push('/community')} style={s.darkBtn}><Text style={{ color: '#FFF', fontWeight: '900' }}>See what girls are saying</Text></Pressable></View></View>
       <SectionTitle title="Fresh on the feed" />
-      <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>Ama's corner</Text><VerifiedMark size={15} /></View><Text style={s.postMeta}>12 min · Accra</Text></View><I name="more" size={20} color={C.muted} /></View><Text style={s.postText}>Girls, help me choose 😭 Which one would you wear to a garden wedding?</Text><Image source={{ uri: imgs[1] }} style={s.postImg} /><View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> 48</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> 16</Text></View></View></Pressable>
+       {homePost && <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={homePost.profile?.avatar_url} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>{homePost.profile?.display_name || 'Girlie'}</Text>{homePost.profile?.verified && <VerifiedMark size={15} />}</View><Text style={s.postMeta}>@{homePost.profile?.handle || 'girlie'} · {new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted} /></View>{!!homePost.body && <Text style={s.postText}>{homePost.body}</Text>}{homePost.media_urls[0] && <Image source={{ uri: homePost.media_urls[0] }} style={s.postImg} />}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> {homeCommentCount}</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> {homeShareCount}</Text></View></View></Pressable>}
       <View style={s.mini}><Text style={s.miniTitle}>Delivered without the stress.</Text><Text style={s.miniText}>Pay once. We calculate delivery and keep you updated.</Text><Pressable onPress={() => router.push('/orders')}><Text style={s.miniLink}>Track an order →</Text></Pressable></View>
       <View style={{ marginTop: 18 }}><SectionTitle title="Your spaces" /><View style={{ flexDirection: 'row', gap: 8 }}><Pressable onPress={() => router.push('/live')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.plum }}><Text style={{ fontSize: 10, fontWeight: '900', color: C.sun }}>LIVE NOW</Text><Text style={{ fontSize: 16, fontWeight: '900', color: '#FFF', marginTop: 5 }}>Watch girls live</Text><Text style={{ fontSize: 10, color: '#EADDE4', marginTop: 4 }}>Join the room →</Text></Pressable><Pressable onPress={() => router.push('/seller-onboarding')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.rose }}><Text style={{ fontSize: 10, fontWeight: '900' }}>SELL WITH US</Text><Text style={{ fontSize: 16, fontWeight: '900', marginTop: 5 }}>Open your shop</Text><Text style={{ fontSize: 10, marginTop: 4, fontWeight: '800' }}>Start here →</Text></Pressable></View></View>
     </Animated.ScrollView>
