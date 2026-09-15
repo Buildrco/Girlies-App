@@ -98,6 +98,8 @@ export async function getSessionUser() {
 export async function createPost(body: string, media: MediaItem[]) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to post.');
+  const trimmedBody = body.trim();
+  if (!trimmedBody && media.length === 0) throw new Error('Write something or add a photo/video.');
   const uploadedPaths: string[] = [];
   try {
     const media_urls: string[] = [];
@@ -108,7 +110,7 @@ export async function createPost(body: string, media: MediaItem[]) {
     }
     const { data, error } = await supabase.from('posts').insert({
       author_id: user.id,
-      body: body.trim(),
+      body: trimmedBody,
       media_urls,
       visibility: 'public',
     }).select().single();
@@ -248,9 +250,11 @@ export async function setBookmark(postId: string, shouldBookmark: boolean) {
 export async function addComment(postId: string, body: string) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in to comment.');
+  const trimmedBody = body.trim();
+  if (!trimmedBody) throw new Error('Write a comment before sending.');
   const { data, error } = await supabase.from('post_comments')
-    .insert({ post_id: postId, user_id: me.id, body: body.trim() }).select().single();
-  if (error) throw error;
+    .insert({ post_id: postId, user_id: me.id, body: trimmedBody }).select().single();
+  if (error) throw new Error(`Comment failed: ${errorMessage(error, 'Supabase rejected the comment')}`);
   return data;
 }
 
