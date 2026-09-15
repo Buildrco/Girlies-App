@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -12,16 +12,7 @@ import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { getPostLikeState, getSessionUser, setFollow, setPostLike } from '../lib/social';
-
-type HomePost = {
-  id: string;
-  author_id: string;
-  body: string;
-  media_urls: string[];
-  created_at: string;
-  profile?: { display_name: string; handle: string; avatar_url: string | null; verified: boolean };
-};
+import { getPostLikeState, getSessionUser, setFollow, setPostLike, getStores, getProducts } from '../lib/social';
 
 const imgs = [
   'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1000&q=85',
@@ -35,125 +26,85 @@ export default function Home() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
   const [hero, setHero] = useState(0);
-  const [followed, setFollowed] = useState<Set<number>>(new Set());
-  const [sellerIds, setSellerIds] = useState<(string | null)[]>([]);
+  const [sellers, setSellers] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
-  const [followingBusy, setFollowingBusy] = useState<Set<number>>(new Set());
-  const [productIds, setProductIds] = useState<string[]>([]);
-  const [homePostId, setHomePostId] = useState<string | null>(null);
-  const [homePost, setHomePost] = useState<HomePost | null>(null);
+  const [homePost, setHomePost] = useState<any | null>(null);
   const [liked, setLiked] = useState(false);
-  const [homeLikeCount, setHomeLikeCount] = useState<number | null>(null);
-  const [homeCommentCount, setHomeCommentCount] = useState(0);
-  const [homeShareCount, setHomeShareCount] = useState(0);
+  const [homeLikeCount, setHomeLikeCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
-  const sellers = ['Nia Hair', 'Amara Beauty', 'Glow Room', 'The Bag Edit', 'Scent Lab'];
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    async function loadLiveState() {
+    (async () => {
       try {
-        const me = await getSessionUser();
+        setLoading(true);
+        const [me, liveStores, liveProducts, postsResult] = await Promise.all([
+          getSessionUser(),
+          getStores(5),
+          getProducts(5),
+          supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility','public').order('created_at',{ascending:false}).limit(1),
+        ]);
+        if (postsResult.error) throw postsResult.error;
         if (!active) return;
         setSessionUserId(me?.id || null);
-        const [profilesResult, productsResult, postResult] = await Promise.all([
-          supabase.from('profiles').select('id').order('created_at', { ascending: true }).limit(sellers.length),
-          supabase.from('products').select('id').order('created_at', { ascending: false }).limit(sellers.length),
-          supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
-        ]);
-        if (profilesResult.error) throw profilesResult.error;
-        if (productsResult.error) throw productsResult.error;
-        if (postResult.error) throw postResult.error;
-        const liveSellerIds = (profilesResult.data || []).map(row => row.id);
-        setSellerIds(liveSellerIds);
-        setProductIds((productsResult.data || []).map(row => row.id));
-        const post = postResult.data?.[0] || null;
-        const postId = post?.id || null;
-        setHomePostId(postId);
-        if (!post) {
-          setHomePost(null);
-          setFollowed(new Set());
-          setLiked(false);
-          setHomeLikeCount(null);
-          setHomeCommentCount(0);
-          setHomeShareCount(0);
-          return;
-        }
-        const [profileResult, followResult, likeResult, countResult, commentsResult, sharesResult] = await Promise.all([
-          supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle(),
-          me ? supabase.from('follows').select('following_id').eq('follower_id', me.id) : Promise.resolve({ data: [], error: null }),
-          getPostLikeState(postId),
-          supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId),
-          supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId),
-          supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId),
-        ]);
-        if (profileResult.error) throw profileResult.error;
-        if (followResult.error) throw followResult.error;
-        if (countResult.error) throw countResult.error;
-        if (commentsResult.error) throw commentsResult.error;
-        if (sharesResult.error) throw sharesResult.error;
-        if (!active) return;
-        setHomePost({ ...post, media_urls: post.media_urls || [], profile: profileResult.data || undefined });
-        const followedIds = new Set((followResult.data || []).map(row => row.following_id));
-        setFollowed(new Set(liveSellerIds.map((id, index) => followedIds.has(id) ? index : -1).filter(index => index >= 0)));
-        setLiked(likeResult);
-        setHomeLikeCount(countResult.count || 0);
-        setHomeCommentCount(commentsResult.count || 0);
-        setHomeShareCount(sharesResult.count || 0);
-      } catch (error) {
-        if (active) Alert.alert('Could not load live activity', error instanceof Error ? error.message : 'Please try again.');
-      }
-    }
-    void loadLiveState();
+        setSellers(liveStores);
+        setProducts(liveProducts);
+        const post = postsResult.data?.[0] || null;
+        setHomePost(post);
+        if (me) {
+          const followResult = await supabase.from('follows').select('following_id').eq('follower_id',me.id);
+          if (followResult.error) throw followResult.error;
+          if (!active) return;
+          setFollowed(new Set((followResult.data || []).map((x:any)=>x.following_id)));
+          if (post) {
+            const [isLiked, countResult] = await Promise.all([getPostLikeState(post.id),supabase.from('post_likes').select('post_id',{count:'exact',head:true}).eq('post_id',post.id)]);
+            if (countResult.error) throw countResult.error;
+            if (!active) return;
+            setLiked(isLiked);
+            setHomeLikeCount(countResult.count || 0);
+          } else { setLiked(false); setHomeLikeCount(0); }
+        } else { setFollowed(new Set()); setLiked(false); setHomeLikeCount(0); }
+      } catch (e:any) { if (active) Alert.alert('Could not load live content',e?.message||'Please try again.'); }
+      finally { if (active) setLoading(false); }
+    })();
     return () => { active = false; };
   }, []));
 
-  async function toggleSeller(index: number) {
-    const targetId = sellerIds[index];
-    if (!targetId) { Alert.alert('Follow unavailable', 'This seller is not connected to a live profile yet.'); return; }
-    if (!sessionUserId) { Alert.alert('Sign in required', 'Please sign in to follow sellers.'); return; }
-    if (targetId === sessionUserId) { Alert.alert('Follow unavailable', 'You cannot follow your own profile.'); return; }
-    if (followingBusy.has(index)) return;
-    const next = !followed.has(index);
-    setFollowingBusy(current => new Set(current).add(index));
-    try {
-      const verified = await setFollow(targetId, next);
-      setFollowed(current => { const copy = new Set(current); if (verified) copy.add(index); else copy.delete(index); return copy; });
-    } catch (error) {
-      Alert.alert('Follow failed', error instanceof Error ? error.message : 'Could not save your follow.');
-    } finally {
-      setFollowingBusy(current => { const copy = new Set(current); copy.delete(index); return copy; });
-    }
+  async function toggleSeller(id: string) {
+    if (!sessionUserId) { Alert.alert('Sign in required','Please sign in to follow sellers.'); return; }
+    if (id === sessionUserId) { Alert.alert('Follow unavailable','You cannot follow your own profile.'); return; }
+    const next=!followed.has(id);
+    setFollowed(current=>{const n=new Set(current);next?n.add(id):n.delete(id);return n;});
+    try { await setFollow(id,next); }
+    catch(e:any){ setFollowed(current=>{const n=new Set(current);next?n.delete(id):n.add(id);return n;}); Alert.alert('Follow failed',e?.message||'Could not save your follow.'); }
   }
 
   async function toggleHomeLike() {
-    if (!homePostId) { Alert.alert('Like unavailable', 'There is no live post to like yet.'); return; }
+    if (!homePost) return;
     if (likeBusy) return;
-    const next = !liked;
-    setLiked(next);
-    setLikeBusy(true);
-    try {
-      const verified = await setPostLike(homePostId, next);
-      setLiked(verified);
-      setHomeLikeCount(current => Math.max(0, (current || 0) + (verified === next ? (next ? 1 : -1) : 0)));
-    } catch (error) {
-      setLiked(!next);
-      Alert.alert('Like failed', error instanceof Error ? error.message : 'Could not save your like.');
-    } finally { setLikeBusy(false); }
+    const next=!liked; setLiked(next); setHomeLikeCount(c=>Math.max(0,c+(next?1:-1))); setLikeBusy(true);
+    try { await setPostLike(homePost.id,next); }
+    catch(e:any){ setLiked(!next); setHomeLikeCount(c=>Math.max(0,c+(next?-1:1))); Alert.alert('Like failed',e?.message||'Could not save your like.'); }
+    finally { setLikeBusy(false); }
   }
+
   return <SafeAreaView style={s.safe}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} /></Pressable></View></View>
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
+      {loading && <View style={s.liveLoading}><ActivityIndicator color={C.pink}/></View>}
       <View><CurvedBanner image={imgs[hero]} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][hero]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][hero]} color={[C.rose, C.sun, C.lilac][hero]} onPress={() => router.push('/shop')} /><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
       <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>
       <SectionTitle title="Popular sellers" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellers.map((name, index) => <Pressable key={name} onPress={() => router.push('/seller/' + index)} style={s.seller}><Avatar size={54} index={index} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{name}</Text><VerifiedMark size={17} /></View><Text style={s.sellerMeta}>{[12.4, 8.3, 6.8, 5.1, 4.7][index]}k followers</Text><Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellers.map((store,index) => <Pressable key={store.id} onPress={() => router.push({pathname:'/seller/[id]',params:{id:store.id}})} style={s.seller}><Avatar size={54} uri={store.owner?.avatar_url} index={index} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{store.name}</Text>{(store.owner?.verified||store.verification_status==='verified')&&<VerifiedMark size={17}/>}</View><Text style={s.sellerMeta}>{Number(store.owner?.followers_count||0).toLocaleString()} followers</Text><Pressable onPress={event=>{event.stopPropagation();void toggleSeller(store.owner_id);}} style={s.follow}><Text style={s.followText}>{followed.has(store.owner_id)?'Following':'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
       <SectionTitle title="Popular products" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{['Silk press wig', 'Rose oud perfume', 'Everyday tote', 'Glow kit', 'Satin set'].map((name, index) => <ProductCard key={name} productId={productIds[index]} name={name} price={'GH₵ ' + [480, 320, 260, 190, 150][index]} image={imgs[(index + 1) % imgs.length]} seller={['Nia Hair', 'Scent Lab', 'Amara Store', 'Glow Room', 'Nia Closet'][index]} onPress={() => router.push({ pathname: '/product', params: { id: String(index) } })} />)}</ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{products.map((product,index)=><ProductCard key={product.id} productId={product.id} name={product.name} price={'GH₵ '+Number(product.price).toFixed(0)} image={product.image_urls?.[0]||imgs[index%imgs.length]} seller={product.store?.name||'Girlies seller'} verified={Boolean(product.store?.owner?.verified||product.store?.verification_status==='verified')} onPress={()=>router.push({pathname:'/product',params:{id:product.id}})}/>)}</ScrollView>
       <View style={s.editorial}><Image source={{ uri: imgs[3] }} style={s.editorialImg} /><View style={s.editorialText}><Text style={s.editorialK}>THE GIRLIE GUIDE</Text><Text style={s.editorialTitle}>Good taste is better when shared.</Text><Text style={s.editorialSub}>Save a look. Ask the community. Find the shop. Make it yours.</Text><Pressable onPress={() => router.push('/community')} style={s.darkBtn}><Text style={{ color: '#FFF', fontWeight: '900' }}>See what girls are saying</Text></Pressable></View></View>
       <SectionTitle title="Fresh on the feed" />
-       {homePost && <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={homePost.profile?.avatar_url} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>{homePost.profile?.display_name || 'Girlie'}</Text>{homePost.profile?.verified && <VerifiedMark size={15} />}</View><Text style={s.postMeta}>@{homePost.profile?.handle || 'girlie'} · {new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted} /></View>{!!homePost.body && <Text style={s.postText}>{homePost.body}</Text>}{homePost.media_urls[0] && <Image source={{ uri: homePost.media_urls[0] }} style={s.postImg} />}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> {homeCommentCount}</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> {homeShareCount}</Text></View></View></Pressable>}
+      {homePost ? <Pressable onPress={()=>router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={undefined} index={2}/><View style={{flex:1}}><Text style={s.postUser}>Community post</Text><Text style={s.postMeta}>{new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted}/></View><Text style={s.postText}>{homePost.body}</Text>{homePost.media_urls?.[0]&&<Image source={{uri:homePost.media_urls[0]}} style={s.postImg}/>}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={()=>void toggleHomeLike()} size={21}/><Text>{homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19}/></View><View style={s.postAction}><I name="share" size={19}/></View></View></Pressable> : <View style={s.emptyLive}><Text style={s.emptyLiveText}>No community posts yet.</Text></View>}
       <View style={s.mini}><Text style={s.miniTitle}>Delivered without the stress.</Text><Text style={s.miniText}>Pay once. We calculate delivery and keep you updated.</Text><Pressable onPress={() => router.push('/orders')}><Text style={s.miniLink}>Track an order →</Text></Pressable></View>
       <View style={{ marginTop: 18 }}><SectionTitle title="Your spaces" /><View style={{ flexDirection: 'row', gap: 8 }}><Pressable onPress={() => router.push('/live')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.plum }}><Text style={{ fontSize: 10, fontWeight: '900', color: C.sun }}>LIVE NOW</Text><Text style={{ fontSize: 16, fontWeight: '900', color: '#FFF', marginTop: 5 }}>Watch girls live</Text><Text style={{ fontSize: 10, color: '#EADDE4', marginTop: 4 }}>Join the room →</Text></Pressable><Pressable onPress={() => router.push('/seller-onboarding')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.rose }}><Text style={{ fontSize: 10, fontWeight: '900' }}>SELL WITH US</Text><Text style={{ fontSize: 16, fontWeight: '900', marginTop: 5 }}>Open your shop</Text><Text style={{ fontSize: 10, marginTop: 4, fontWeight: '800' }}>Start here →</Text></Pressable></View></View>
     </Animated.ScrollView>
