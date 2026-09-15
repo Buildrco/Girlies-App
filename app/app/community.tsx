@@ -44,7 +44,6 @@ export default function Community() {
   const followDesiredRef=useRef(new Map<string,boolean>());
   const bookmarkDesiredRef=useRef(new Map<string,boolean>());
   const mutationQueuesRef=useRef(new Map<string,Promise<void>>());
-  const loadRef=useRef<()=>Promise<void>>(() => Promise.resolve());
 
   const withTimeout = useCallback(<T,>(promise: Promise<T>, ms=8000) => new Promise<T>((resolve,reject) => {
     const timer=setTimeout(()=>reject(new Error('Feed request timed out. Check your connection and try again.')),ms);
@@ -92,13 +91,15 @@ export default function Community() {
     const postIds=postRows.map(post=>post.id);
     if (!postIds.length) return;
     try {
-      const {data,error}=await withTimeout(Promise.resolve(supabase.from('post_likes').select('post_id').in('post_id',postIds)));
-      if (error) throw error;
+      const countsByPost=await withTimeout(Promise.all(postIds.map(async postId=>{
+        const {count,error}=await withTimeout(Promise.resolve(
+          supabase.from('post_likes').select('post_id',{count:'exact',head:true}).eq('post_id',postId)
+        ));
+        if (error) throw error;
+        return [postId,typeof count==='number'?count:0] as const;
+      })));
       if (!isCurrentFocus(generation)) return;
-      const counts=(data||[]).reduce((result:any,row:any)=>{
-        result[row.post_id]=(result[row.post_id]||0)+1;
-        return result;
-      },{} as Record<string,number>);
+      const counts=Object.fromEntries(countsByPost) as Record<string,number>;
       setLikeCounts(counts);
       setPosts(current=>current.map(post=>({...post,like_count:counts[post.id]||0})));
     } catch(e) {
@@ -106,7 +107,7 @@ export default function Community() {
     }
   },[isCurrentFocus,withTimeout]);
 
-  const loadUserState = useCallback(async (generation:number) => {
+  const loadUserState = useCallback(async (postRows:any[], generation:number) => {
     try {
       const me=await getSessionUser();
       if (!me) {
@@ -114,10 +115,13 @@ export default function Community() {
         // A successful Supabase query below replaces it with the source of truth.
         return;
       }
+      const postIds=[...new Set(postRows.map(post=>post.id))];
+      const authorIds=[...new Set(postRows.map(post=>post.author_id).filter(Boolean))];
+      if (!postIds.length) return;
       const [likeResult,bookmarkResult,followResult]=await withTimeout(Promise.all([
-        supabase.from('post_likes').select('post_id').eq('user_id',me.id),
-        supabase.from('bookmarks').select('post_id').eq('user_id',me.id),
-        supabase.from('follows').select('following_id').eq('follower_id',me.id),
+        supabase.from('post_likes').select('post_id').eq('user_id',me.id).in('post_id',postIds),
+        supabase.from('bookmarks').select('post_id').eq('user_id',me.id).in('post_id',postIds),
+        supabase.from('follows').select('following_id').eq('follower_id',me.id).in('following_id',authorIds),
       ]));
       if (likeResult.error) throw likeResult.error;
       if (bookmarkResult.error) throw bookmarkResult.error;
@@ -144,7 +148,7 @@ export default function Community() {
     void loadPostProfiles(postRows,generation);
     void loadStories(generation);
     void loadLikeCounts(postRows,generation);
-    void loadUserState(generation);
+    void loadUserState(postRows,generation);
   },[loadLikeCounts,loadPostProfiles,loadStories,loadUserState]);
 
   const load = useCallback(async () => {
@@ -176,14 +180,12 @@ export default function Community() {
     }
   },[hydrateCommunity,isCurrentFocus,withTimeout]);
 
-  loadRef.current=load;
-
   useFocusEffect(useCallback(() => {
     mountedRef.current=true;
     focusedRef.current=true;
     reset();
     focusGenerationRef.current+=1;
-    const interactionTask = InteractionManager.runAfterInteractions(() => { void loadRef.current(); });
+    const interactionTask = InteractionManager.runAfterInteractions(() => { void load(); });
     return () => {
       interactionTask.cancel();
       reset();
@@ -192,7 +194,7 @@ export default function Community() {
       focusGenerationRef.current+=1;
       loadingRef.current=false;
     };
-  },[reset]));
+  },[load,reset]));
 
   const enqueueMutation=useCallback((key:string, mutation:()=>Promise<void>)=>{
     const previous=mutationQueuesRef.current.get(key)||Promise.resolve();
