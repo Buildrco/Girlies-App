@@ -150,9 +150,8 @@ export async function setFollow(userId: string, shouldFollow: boolean) {
   if (!me) throw new Error('Please sign in.');
   if (me.id === userId) return false;
   if (shouldFollow) {
-    const { error } = await supabase.from('follows').upsert(
+    const { error } = await supabase.from('follows').insert(
       { follower_id: me.id, following_id: userId },
-      { onConflict: 'follower_id,following_id' },
     );
     if (error) throw new Error(`Follow failed: ${errorMessage(error, 'Supabase rejected the follow')}`);
   } else {
@@ -172,9 +171,8 @@ export async function setPostLike(postId: string, shouldLike: boolean) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in to like posts.');
   if (shouldLike) {
-    const { error } = await supabase.from('post_likes').upsert(
+    const { error } = await supabase.from('post_likes').insert(
       { post_id: postId, user_id: me.id },
-      { onConflict: 'post_id,user_id' },
     );
     if (error) throw new Error(`Like failed: ${errorMessage(error, 'Supabase rejected the like')}`);
   } else {
@@ -230,9 +228,8 @@ export async function setBookmark(postId: string, shouldBookmark: boolean) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in.');
   if (shouldBookmark) {
-    const { error } = await supabase.from('bookmarks').upsert(
+    const { error } = await supabase.from('bookmarks').insert(
       { post_id: postId, user_id: me.id },
-      { onConflict: 'post_id,user_id' },
     );
     if (error) throw new Error(`Bookmark failed: ${errorMessage(error, 'Supabase rejected the bookmark')}`);
   } else {
