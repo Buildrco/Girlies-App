@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, InteractionManager, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -162,7 +162,9 @@ export default function Community() {
       const nextPosts=(data||[]).map((post:any)=>({...post,media_urls:post.media_urls||[]}));
       setPosts(nextPosts);
       setLoading(false);
-      hydrateCommunity(nextPosts,generation);
+      InteractionManager.runAfterInteractions(() => {
+        if (isCurrentFocus(generation)) hydrateCommunity(nextPosts,generation);
+      });
     } catch(e:any) {
       if (isCurrentFocus(generation)) setError(e?.message||'Could not load your feed.');
     } finally {
@@ -181,8 +183,9 @@ export default function Community() {
     focusedRef.current=true;
     reset();
     focusGenerationRef.current+=1;
-    void load();
+    const interactionTask = InteractionManager.runAfterInteractions(() => { void load(); });
     return () => {
+      interactionTask.cancel();
       reset();
       focusedRef.current=false;
       mountedRef.current=false;
@@ -340,6 +343,7 @@ export default function Community() {
       initialNumToRender={5}
       maxToRenderPerBatch={5}
       windowSize={5}
+      removeClippedSubviews={false}
     />
     <Pressable style={[s.fab,{transform:[{translateY:visibility.interpolate({inputRange:[0,1],outputRange:[90,0]})}]}]} onPress={()=>router.push('/create')}><I name="plus" size={28} color="#FFF"/></Pressable>
   </SafeAreaView>;

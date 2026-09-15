@@ -19,6 +19,7 @@ export default function Layout() {
         screenOptions={{
           headerShown: false,
           freezeOnBlur: false,
+          detachInactiveScreens: false,
         }}
       >
         <Stack.Screen name="home" options={{ animation: 'none' }} />
