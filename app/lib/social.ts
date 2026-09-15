@@ -277,3 +277,176 @@ export async function markStoryViewed(storyId: string) {
     console.warn('Could not mark story as viewed:', errorMessage(error, 'unknown error'));
   }
 }
+
+
+export type ChatSummary = {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  verified: boolean;
+  preview: string;
+  time: string;
+  unread: number;
+  otherUserId: string | null;
+};
+
+export async function getChatSummaries(): Promise<ChatSummary[]> {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to view messages.');
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from('conversation_members')
+    .select('conversation_id')
+    .eq('user_id', me.id);
+  if (membershipError) throw new Error(`Could not load conversations: ${errorMessage(membershipError, 'Supabase rejected the request')}`);
+
+  const ids = (memberships || []).map((row: any) => row.conversation_id);
+  if (!ids.length) return [];
+
+  const { data: conversations, error: conversationError } = await supabase
+    .from('conversations')
+    .select('id,kind,title,created_at')
+    .in('id', ids)
+    .order('created_at', { ascending: false });
+  if (conversationError) throw new Error(`Could not load conversations: ${errorMessage(conversationError, 'Supabase rejected the request')}`);
+
+  const { data: members, error: membersError } = await supabase
+    .from('conversation_members')
+    .select('conversation_id,user_id')
+    .in('conversation_id', ids);
+  if (membersError) throw new Error(`Could not load conversation members: ${errorMessage(membersError, 'Supabase rejected the request')}`);
+
+  const otherIds = [...new Set((members || []).filter((m: any) => m.user_id !== me.id).map((m: any) => m.user_id))];
+  const { data: profiles, error: profilesError } = otherIds.length
+    ? await supabase.from('profiles').select('id,display_name,avatar_url,verified').in('id', otherIds)
+    : { data: [], error: null as any };
+  if (profilesError) throw new Error(`Could not load chat profiles: ${errorMessage(profilesError, 'Supabase rejected the request')}`);
+
+  const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+  const otherByConversation = new Map<string, string>();
+  (members || []).forEach((m: any) => {
+    if (m.user_id !== me.id) otherByConversation.set(m.conversation_id, m.user_id);
+  });
+
+  const { data: messages, error: messagesError } = await supabase
+    .from('messages')
+    .select('id,conversation_id,sender_id,body,created_at,status')
+    .in('conversation_id', ids)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (messagesError) throw new Error(`Could not load messages: ${errorMessage(messagesError, 'Supabase rejected the request')}`);
+
+  const latest = new Map<string, any>();
+  (messages || []).forEach((m: any) => { if (!latest.has(m.conversation_id)) latest.set(m.conversation_id, m); });
+
+  return (conversations || []).map((conversation: any) => {
+    const otherId = otherByConversation.get(conversation.id) || null;
+    const profile = otherId ? profileMap.get(otherId) : null;
+    const last = latest.get(conversation.id);
+    const preview = last?.body || (last?.media ? 'Media' : 'Start a conversation');
+    const date = last?.created_at || conversation.created_at;
+    return {
+      id: conversation.id,
+      name: profile?.display_name || conversation.title || 'Conversation',
+      avatar_url: profile?.avatar_url || null,
+      verified: Boolean(profile?.verified),
+      preview,
+      time: formatChatTime(date),
+      unread: 0,
+      otherUserId: otherId,
+    };
+  });
+}
+
+function formatChatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.max(0, Math.floor(diff / 60000));
+  if (minutes < 60) return `${minutes || 1}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  if (hours < 48) return 'Yesterday';
+  return date.toLocaleDateString();
+}
+
+export async function createDirectConversation(otherUserId: string) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to start a conversation.');
+  if (me.id === otherUserId) throw new Error('You cannot message yourself.');
+
+  const { data: mine, error: mineError } = await supabase
+    .from('conversation_members').select('conversation_id').eq('user_id', me.id);
+  if (mineError) throw new Error(`Could not load your conversations: ${errorMessage(mineError, 'Supabase rejected the request')}`);
+  const mineIds = (mine || []).map((row: any) => row.conversation_id);
+
+  if (mineIds.length) {
+    const { data: theirMemberships, error: theirError } = await supabase
+      .from('conversation_members').select('conversation_id').eq('user_id', otherUserId).in('conversation_id', mineIds);
+    if (theirError) throw new Error(`Could not check existing conversation: ${errorMessage(theirError, 'Supabase rejected the request')}`);
+    if (theirMemberships?.length) {
+      const candidateIds = theirMemberships.map((row: any) => row.conversation_id);
+      const { data: members, error: membersError } = await supabase
+        .from('conversation_members').select('conversation_id,user_id').in('conversation_id', candidateIds);
+      if (membersError) throw new Error(`Could not verify conversation: ${errorMessage(membersError, 'Supabase rejected the request')}`);
+      const direct = candidateIds.find((conversationId: string) => {
+        const users = (members || []).filter((m: any) => m.conversation_id === conversationId).map((m: any) => m.user_id);
+        return users.length === 2 && users.includes(me.id) && users.includes(otherUserId);
+      });
+      if (direct) return direct;
+    }
+  }
+
+  const { data: conversation, error: createError } = await supabase
+    .from('conversations').insert({ kind: 'direct' }).select('id').single();
+  if (createError || !conversation) throw new Error(`Could not create conversation: ${errorMessage(createError, 'Supabase rejected the conversation')}`);
+
+  const { error: memberInsertError } = await supabase.from('conversation_members').insert([
+    { conversation_id: conversation.id, user_id: me.id },
+    { conversation_id: conversation.id, user_id: otherUserId },
+  ]);
+  if (memberInsertError) {
+    await supabase.from('conversations').delete().eq('id', conversation.id);
+    throw new Error(`Could not add conversation members: ${errorMessage(memberInsertError, 'Supabase rejected the request')}`);
+  }
+  return conversation.id as string;
+}
+
+export async function getConversation(id: string) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in.');
+  const { data: membership, error: membershipError } = await supabase
+    .from('conversation_members').select('conversation_id').eq('conversation_id', id).eq('user_id', me.id).maybeSingle();
+  if (membershipError) throw new Error(`Could not open conversation: ${errorMessage(membershipError, 'Supabase rejected the request')}`);
+  if (!membership) throw new Error('You are not a member of this conversation.');
+
+  const { data: members, error: membersError } = await supabase
+    .from('conversation_members').select('user_id').eq('conversation_id', id);
+  if (membersError) throw new Error(`Could not load conversation members: ${errorMessage(membersError, 'Supabase rejected the request')}`);
+  const otherId = (members || []).map((m: any) => m.user_id).find((userId: string) => userId !== me.id) || null;
+  let profile: any = null;
+  if (otherId) {
+    const result = await supabase.from('profiles').select('id,display_name,avatar_url,verified').eq('id', otherId).maybeSingle();
+    if (result.error) throw new Error(`Could not load profile: ${errorMessage(result.error, 'Supabase rejected the request')}`);
+    profile = result.data;
+  }
+  const { data: messages, error: messagesError } = await supabase
+    .from('messages').select('id,sender_id,body,media,created_at,status').eq('conversation_id', id).order('created_at', { ascending: true });
+  if (messagesError) throw new Error(`Could not load messages: ${errorMessage(messagesError, 'Supabase rejected the request')}`);
+  return { meId: me.id, otherId, profile, messages: messages || [] };
+}
+
+export async function sendMessage(conversationId: string, body: string) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to send a message.');
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+  const { data, error } = await supabase.from('messages').insert({
+    conversation_id: conversationId,
+    sender_id: me.id,
+    body: trimmed,
+    status: 'sent',
+  }).select('id,sender_id,body,media,created_at,status').single();
+  if (error) throw new Error(`Message failed: ${errorMessage(error, 'Supabase rejected the message')}`);
+  return data;
+}
