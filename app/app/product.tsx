@@ -6,7 +6,8 @@ import{C}from'../constants/theme';
 import{I}from'../components/Icons';
 import{Avatar,VerifiedMark}from'../Avatar';
 import{LikeButton}from'../components/LikeButton';
-import{getProductLikeState,setProductLike,getSessionUser,setFollow,supabase}from'../lib/social';
+import{getProductLikeState,setProductLike,getSessionUser,setFollow}from'../lib/social';
+import{supabase}from'../lib/supabase';
 
 type Product={id:string;name:string;description?:string;category?:string;price:number;currency?:string;stock?:number;fulfillment?:string;estimated_arrival?:string;image_urls?:string[];attributes?:any;store_id:string};
 type Seller={id:string;name:string;handle?:string;rating?:number;location?:string;verified?:boolean};
