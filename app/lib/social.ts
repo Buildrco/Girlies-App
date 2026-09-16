@@ -112,6 +112,8 @@ export type ProfileRecord = {
   links?: string[] | null;
 };
 
+export type CountryOption = { name: string; iso2: string };
+
 const PROFILE_BASE_SELECT = 'id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at';
 const PROFILE_SELECT = `${PROFILE_BASE_SELECT},country,area,location,date_of_birth,links`;
 
@@ -163,6 +165,7 @@ export function getProfile(userId: string) {
 
 export async function updateCurrentProfile(input: {
   display_name: string;
+  handle: string;
   bio: string;
   country: string;
   area: string;
@@ -173,8 +176,13 @@ export async function updateCurrentProfile(input: {
 }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to edit your profile.');
+  const handle = input.handle.trim().replace(/^@+/, '').toLowerCase();
+  if (!/^[a-z0-9._-]{3,30}$/.test(handle)) {
+    throw new Error('Username must be 3–30 characters using letters, numbers, dots, underscores or hyphens.');
+  }
   const extendedUpdate = await supabase.from('profiles').update({
     display_name: input.display_name.trim(),
+    handle,
     bio: input.bio.trim(),
     country: input.country.trim() || null,
     area: input.area.trim() || null,
@@ -191,11 +199,36 @@ export async function updateCurrentProfile(input: {
 
   const baseUpdate = await supabase.from('profiles').update({
     display_name: input.display_name.trim(),
+    handle,
     bio: input.bio.trim(),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url } : {}),
   }).eq('id', user.id).select().single();
   if (baseUpdate.error) throw new Error(`Profile update failed: ${errorMessage(baseUpdate.error, 'Supabase rejected the profile')}`);
   return baseUpdate.data as ProfileRecord;
+}
+
+export async function getCountries(): Promise<CountryOption[]> {
+  const response = await fetch('https://countriesnow.space/api/v0.1/countries/positions');
+  if (!response.ok) throw new Error('Could not load countries.');
+  const payload = await response.json();
+  return (payload.data || [])
+    .map((country: any) => ({ name: String(country.name || ''), iso2: String(country.iso2 || '') }))
+    .filter((country: CountryOption) => country.name)
+    .sort((a: CountryOption, b: CountryOption) => a.name.localeCompare(b.name));
+}
+
+export async function getAreas(country: string): Promise<string[]> {
+  const response = await fetch('https://countriesnow.space/api/v0.1/countries/states', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ country }),
+  });
+  if (!response.ok) throw new Error('Could not load areas for this country.');
+  const payload = await response.json();
+  return (payload.data?.states || [])
+    .map((area: any) => String(area.name || ''))
+    .filter(Boolean)
+    .sort((a: string, b: string) => a.localeCompare(b));
 }
 
 export async function createPost(body: string, media: MediaItem[]) {

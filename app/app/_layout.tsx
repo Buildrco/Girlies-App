@@ -3,6 +3,7 @@ import { Stack, usePathname } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
+import { TouchFeedbackRoot } from '../components/MotionPressable';
 
 function NavigationChrome() {
   const pathname = usePathname();
@@ -14,19 +15,21 @@ function NavigationChrome() {
 export default function Layout() {
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <StatusBar style="dark" />
-    <ChromeVisibilityProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          freezeOnBlur: false,
-        }}
-      >
-        <Stack.Screen name="home" options={{ animation: 'none' }} />
-        <Stack.Screen name="shop" options={{ animation: 'none' }} />
-        <Stack.Screen name="community" options={{ animation: 'none' }} />
-        <Stack.Screen name="profile" options={{ animation: 'none' }} />
-      </Stack>
-      <NavigationChrome />
-    </ChromeVisibilityProvider>
+    <TouchFeedbackRoot>
+      <ChromeVisibilityProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            freezeOnBlur: false,
+          }}
+        >
+          <Stack.Screen name="home" options={{ animation: 'none' }} />
+          <Stack.Screen name="shop" options={{ animation: 'none' }} />
+          <Stack.Screen name="community" options={{ animation: 'none' }} />
+          <Stack.Screen name="profile" options={{ animation: 'none' }} />
+        </Stack>
+        <NavigationChrome />
+      </ChromeVisibilityProvider>
+    </TouchFeedbackRoot>
   </GestureHandlerRootView>;
 }

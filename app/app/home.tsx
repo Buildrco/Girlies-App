@@ -12,7 +12,7 @@ import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { getPostLikeState, getProducts, getSessionUser, setFollow, setPostLike, type ProductRecord } from '../lib/social';
+import { getCurrentProfile, getPostLikeState, getProducts, getSessionUser, setFollow, setPostLike, type ProductRecord, type ProfileRecord } from '../lib/social';
 
 type HomePost = {
   id: string;
@@ -50,6 +50,7 @@ export default function Home() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [followingBusy, setFollowingBusy] = useState<Set<number>>(new Set());
   const [products, setProducts] = useState<ProductRecord[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<ProfileRecord | null>(null);
   const [homePostId, setHomePostId] = useState<string | null>(null);
   const [homePost, setHomePost] = useState<HomePost | null>(null);
   const [liked, setLiked] = useState(false);
@@ -64,7 +65,8 @@ export default function Home() {
         const me = await getSessionUser();
         if (!active) return;
         setSessionUserId(me?.id || null);
-        const [profilesResult, productsResult, postResult] = await Promise.all([
+        const [current, profilesResult, productsResult, postResult] = await Promise.all([
+          getCurrentProfile().catch(() => null),
           supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count').order('created_at', { ascending: true }).limit(5),
           getProducts(5),
           supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
@@ -72,6 +74,7 @@ export default function Home() {
         if (profilesResult.error) throw profilesResult.error;
         if (postResult.error) throw postResult.error;
         const liveSellers = (profilesResult.data || []) as SellerProfile[];
+        setCurrentProfile(current);
         const liveSellerIds = liveSellers.map(row => row.id);
         setSellerProfiles(liveSellers);
         setSellerIds(liveSellerIds);
@@ -152,7 +155,7 @@ export default function Home() {
   }
   return <SafeAreaView style={s.safe}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
-      <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} /></Pressable></View></View>
+      <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} uri={currentProfile?.avatar_url} verified={currentProfile?.verified} /></Pressable></View></View>
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
       <View><CurvedBanner image={imgs[hero]} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][hero]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][hero]} color={[C.rose, C.sun, C.lilac][hero]} onPress={() => router.push('/shop')} /><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
       <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>

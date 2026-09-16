@@ -42,7 +42,7 @@ export default function UserProfile() {
   const images = posts.flatMap(post => post.media_urls || []).filter(Boolean);
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
     <View style={s.top}><Pressable onPress={() => router.back()}><I name="back" size={31} /></Pressable><Text style={s.topTitle}>Profile</Text><View style={{ width: 31 }} /></View>
-    <View style={s.cover}><View style={s.coverShape} /><View style={s.avatar}><Avatar size={86} uri={profile.avatar_url} /></View></View>
+    <View style={s.cover}><View style={s.coverShape} /><View style={s.avatar}><Avatar size={86} uri={profile.avatar_url} verified={profile.verified} /></View></View>
     <Text style={s.name}>{profile.display_name} {profile.verified && <VerifiedMark size={16} />}</Text><Text style={s.handle}>@{profile.handle}{profile.location ? ` · ${profile.location}` : ''}</Text>
     <Text style={s.bio}>{profile.bio || 'Sharing good finds and little moments with the girls.'}</Text>
     {(profile.country || profile.area) && <Text style={s.place}><I name="location" size={14} color={C.muted} /> {[profile.area, profile.country].filter(Boolean).join(', ')}</Text>}
