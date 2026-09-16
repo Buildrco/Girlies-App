@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../constants/theme';
 import { I } from '../../components/Icons';
 import { Avatar, VerifiedMark } from '../../Avatar';
-import { getProducts, type ProfileRecord, type ProductRecord } from '../../lib/social';
+import { getProfile, getProducts, type ProfileRecord, type ProductRecord } from '../../lib/social';
 import { supabase } from '../../lib/supabase';
 
 type Post = { id: string; media_urls: string[] | null };
@@ -23,15 +23,14 @@ export default function UserProfile() {
     let active = true;
     (async () => {
       try {
-        const [profileResult, postsResult, storeResult] = await Promise.all([
-          supabase.from('profiles').select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links').eq('id', userId).maybeSingle(),
+        const [profile, postsResult, storeResult] = await Promise.all([
+          getProfile(userId),
           supabase.from('posts').select('id,media_urls').eq('author_id', userId).order('created_at', { ascending: false }),
           supabase.from('stores').select('id').eq('owner_id', userId).maybeSingle(),
         ]);
-        if (profileResult.error) throw profileResult.error;
         if (postsResult.error) throw postsResult.error;
         if (!active) return;
-        setProfile(profileResult.data as ProfileRecord | null);
+        setProfile(profile);
         setPosts((postsResult.data || []) as Post[]);
         if (storeResult.data) { setStoreId(storeResult.data.id); setProducts(await getProducts(30, { storeId: storeResult.data.id })); }
       } catch { if (active) setProfile(null); } finally { if (active) setLoading(false); }

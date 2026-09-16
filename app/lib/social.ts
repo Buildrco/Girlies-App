@@ -112,16 +112,53 @@ export type ProfileRecord = {
   links?: string[] | null;
 };
 
+const PROFILE_BASE_SELECT = 'id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at';
+const PROFILE_SELECT = `${PROFILE_BASE_SELECT},country,area,location,date_of_birth,links`;
+
+function isMissingProfileColumn(error: unknown) {
+  const message = errorMessage(error, '').toLowerCase();
+  return message.includes('column profiles.') && message.includes('does not exist');
+}
+
+async function selectProfile(userId: string): Promise<ProfileRecord | null> {
+  const extended = await supabase
+    .from('profiles')
+    .select(PROFILE_SELECT)
+    .eq('id', userId)
+    .maybeSingle();
+  if (!extended.error) return extended.data as ProfileRecord | null;
+  if (!isMissingProfileColumn(extended.error)) {
+    throw new Error(`Could not load your profile: ${errorMessage(extended.error, 'Supabase rejected the request')}`);
+  }
+
+  // Older databases do not have the optional profile fields yet. Keep the
+  // signed-in profile usable while the migration is being applied.
+  const base = await supabase
+    .from('profiles')
+    .select(PROFILE_BASE_SELECT)
+    .eq('id', userId)
+    .maybeSingle();
+  if (base.error) {
+    throw new Error(`Could not load your profile: ${errorMessage(base.error, 'Supabase rejected the request')}`);
+  }
+  return base.data ? {
+    ...(base.data as ProfileRecord),
+    country: null,
+    area: null,
+    location: null,
+    date_of_birth: null,
+    links: [],
+  } : null;
+}
+
 export async function getCurrentProfile(): Promise<ProfileRecord | null> {
   const user = await getSessionUser();
   if (!user) return null;
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links')
-    .eq('id', user.id)
-    .maybeSingle();
-  if (error) throw new Error(`Could not load your profile: ${errorMessage(error, 'Supabase rejected the request')}`);
-  return data as ProfileRecord | null;
+  return selectProfile(user.id);
+}
+
+export function getProfile(userId: string) {
+  return selectProfile(userId);
 }
 
 export async function updateCurrentProfile(input: {
@@ -136,7 +173,7 @@ export async function updateCurrentProfile(input: {
 }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to edit your profile.');
-  const { data, error } = await supabase.from('profiles').update({
+  const extendedUpdate = await supabase.from('profiles').update({
     display_name: input.display_name.trim(),
     bio: input.bio.trim(),
     country: input.country.trim() || null,
@@ -146,8 +183,19 @@ export async function updateCurrentProfile(input: {
     links: input.links.filter(Boolean),
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url } : {}),
   }).eq('id', user.id).select().single();
-  if (error) throw new Error(`Profile update failed: ${errorMessage(error, 'Supabase rejected the profile')}`);
-  return data as ProfileRecord;
+
+  if (!extendedUpdate.error) return extendedUpdate.data as ProfileRecord;
+  if (!isMissingProfileColumn(extendedUpdate.error)) {
+    throw new Error(`Profile update failed: ${errorMessage(extendedUpdate.error, 'Supabase rejected the profile')}`);
+  }
+
+  const baseUpdate = await supabase.from('profiles').update({
+    display_name: input.display_name.trim(),
+    bio: input.bio.trim(),
+    ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url } : {}),
+  }).eq('id', user.id).select().single();
+  if (baseUpdate.error) throw new Error(`Profile update failed: ${errorMessage(baseUpdate.error, 'Supabase rejected the profile')}`);
+  return baseUpdate.data as ProfileRecord;
 }
 
 export async function createPost(body: string, media: MediaItem[]) {

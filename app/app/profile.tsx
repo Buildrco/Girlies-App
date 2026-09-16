@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, View, Text, Pressable, Image, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { Avatar, VerifiedMark } from '../Avatar';
 import { I } from '../components/Icons';
 import { useChromeVisibility } from '../components/BottomNav';
 import type { ProfileRecord, ProductRecord } from '../lib/social';
-import { getProducts, getStore } from '../lib/social';
+import { getCurrentProfile, getProducts, getStore } from '../lib/social';
 import { supabase } from '../lib/supabase';
 
 type Post = { id: string; media_urls: string[] | null };
@@ -27,19 +27,18 @@ export default function Profile() {
       setPosts([]);
       return;
     }
-    const [profileResult, postsResult, store] = await Promise.all([
-      supabase.from('profiles').select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links').eq('id', userId).maybeSingle(),
+    const [currentProfile, postsResult, store] = await Promise.all([
+      getCurrentProfile(),
       supabase.from('posts').select('id,media_urls').eq('author_id', userId).order('created_at', { ascending: false }),
       getStore(userId).catch(() => null),
     ]);
-    if (profileResult.error) throw profileResult.error;
     if (postsResult.error) throw postsResult.error;
-    setProfile(profileResult.data as ProfileRecord | null);
+    setProfile(currentProfile);
     setPosts((postsResult.data || []) as Post[]);
     setProducts(store ? await getProducts(30, { storeId: store.id }) : []);
   }, []);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
     const restore = async () => {
       try {
@@ -53,6 +52,11 @@ export default function Profile() {
       }
     };
     void restore();
+    return () => { active = false; };
+  }, [load]));
+
+  useEffect(() => {
+    let active = true;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       setError('');
@@ -67,7 +71,7 @@ export default function Profile() {
 
   return <SafeAreaView style={s.safe}>
     <ScrollView contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
-      <View style={s.top}><Text style={s.h}>Profile</Text><Pressable onPress={() => router.push('/settings')}><I name="settings" size={24} /></Pressable></View>
+      <View style={s.top}><Text style={s.h}>Profile</Text><Pressable onPress={() => router.push('/edit-profile')}><I name="settings" size={24} /></Pressable></View>
       <View style={s.cover}><View style={s.coverShape} /><View style={s.avatarWrap}><Avatar size={92} uri={profile.avatar_url} /></View></View>
       <View style={s.info}><Text style={s.name}>{profile.display_name} {profile.verified && <VerifiedMark size={16} />}</Text><Text style={s.handle}>@{profile.handle}{profile.location ? ` · ${profile.location}` : ''}</Text><Text style={s.bio}>{profile.bio || 'Share your latest moments with the girls.'}</Text>{(profile.country || profile.area) && <Text style={s.place}><I name="location" size={14} color={C.muted} /> {[profile.area, profile.country].filter(Boolean).join(', ')}</Text>}{profile.links?.length ? <View style={s.links}>{profile.links.map(link => <Text key={link} style={s.link}>{link}</Text>)}</View> : null}<Text style={s.join}>Joined {new Date(profile.created_at).toLocaleDateString()}</Text><View style={s.stats}><View><Text style={s.num}>{profile.followers_count}</Text><Text style={s.label}>Followers</Text></View><View><Text style={s.num}>{profile.following_count}</Text><Text style={s.label}>Following</Text></View><View><Text style={s.num}>{posts.length}</Text><Text style={s.label}>Posts</Text></View></View><View style={s.actions}><Pressable style={s.edit} onPress={() => router.push('/edit-profile')}><Text style={{ fontWeight: '900' }}>Edit profile</Text></Pressable><Pressable style={s.shopBtn} onPress={() => router.push('/seller/me')}><I name="shop" size={18} color="#FFF" /><Text style={{ color: '#FFF', fontWeight: '900' }}>My shop</Text></Pressable></View></View>
       <View style={s.tabs}>{['Posts', 'Shop', 'Services'].map(item => <Pressable key={item} onPress={() => setTab(item)} style={[s.tab, item === tab && s.tabOn]}><Text style={{ fontWeight: '900', fontSize: 12 }}>{item}</Text></Pressable>)}</View>

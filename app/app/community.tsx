@@ -40,24 +40,28 @@ export default function Community() {
       setLoading(true); setError('');
       const postResult: any = await waitFor(supabase.from('posts').select('id,author_id,body,media_urls,visibility,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(20));
       if (postResult.error) throw postResult.error;
-      const rows: Post[] = (postResult.data || []).map((post: any) => ({ ...post, media_urls: post.media_urls || [] }));
+      const rows: Post[] = (postResult.data || []).map((post: any) => ({ ...post, media_urls: Array.isArray(post.media_urls) ? post.media_urls : [] }));
       const authorIds = [...new Set(rows.map(post => post.author_id))];
       const postIds = rows.map(post => post.id);
-      const [profilesResult, storiesResult, likesResult] = await Promise.all([
+      setPosts(rows);
+      setLikeCounts({});
+      setLoading(false);
+      setRefreshing(false);
+      const [profilesResult, storiesResult, likesResult] = await Promise.allSettled([
         authorIds.length ? waitFor(supabase.from('profiles').select('id,display_name,handle,avatar_url,verified').in('id', authorIds)) : Promise.resolve({ data: [], error: null }),
         waitFor(supabase.from('stories').select('id,user_id,media_url,media_type').gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(20)),
         postIds.length ? waitFor(supabase.from('post_likes').select('post_id').in('post_id', postIds)) : Promise.resolve({ data: [], error: null }),
       ]);
-      if (profilesResult.error) throw profilesResult.error;
-      if (storiesResult.error) throw storiesResult.error;
-      if (likesResult.error) throw likesResult.error;
       if (!active) return;
-      const profileMap = new Map((profilesResult.data || []).map((profile: any) => [profile.id, profile]));
+      const profileRows = profilesResult.status === 'fulfilled' && !profilesResult.value.error ? profilesResult.value.data || [] : [];
+      const storyRows = storiesResult.status === 'fulfilled' && !storiesResult.value.error ? storiesResult.value.data || [] : [];
+      const likeRows = likesResult.status === 'fulfilled' && !likesResult.value.error ? likesResult.value.data || [] : [];
+      const profileMap = new Map(profileRows.map((profile: any) => [profile.id, profile]));
       const counts: Record<string, number> = {};
-      (likesResult.data || []).forEach((row: any) => { counts[row.post_id] = (counts[row.post_id] || 0) + 1; });
+      likeRows.forEach((row: any) => { counts[row.post_id] = (counts[row.post_id] || 0) + 1; });
       setPosts(rows.map(post => ({ ...post, profile: profileMap.get(post.author_id), like_count: counts[post.id] || 0 })));
       setLikeCounts(counts);
-      setStories((storiesResult.data || []).map((story: any) => ({ ...story, profile: profileMap.get(story.user_id) })));
+      setStories(storyRows.map((story: any) => ({ ...story, profile: profileMap.get(story.user_id) })));
     } catch (e: any) {
       if (active) setError(e?.message || 'Could not load your feed.');
     } finally {
