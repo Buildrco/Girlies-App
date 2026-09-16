@@ -48,7 +48,7 @@ function getExtension(item: MediaItem, mimeType: string) {
   return item.type === 'video' ? 'mp4' : 'jpg';
 }
 
-async function uploadMedia(userId: string, item: MediaItem, folder: 'posts' | 'stories') {
+export async function uploadMedia(userId: string, item: MediaItem, folder: 'posts' | 'stories' | 'products' | 'avatars') {
   const mimeType = getMimeType(item);
   const extension = getExtension(item, mimeType);
   const uniqueName = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -105,6 +105,11 @@ export type ProfileRecord = {
   followers_count: number;
   following_count: number;
   created_at: string;
+  country?: string | null;
+  area?: string | null;
+  location?: string | null;
+  date_of_birth?: string | null;
+  links?: string[] | null;
 };
 
 export async function getCurrentProfile(): Promise<ProfileRecord | null> {
@@ -112,11 +117,37 @@ export async function getCurrentProfile(): Promise<ProfileRecord | null> {
   if (!user) return null;
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at')
+    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links')
     .eq('id', user.id)
     .maybeSingle();
   if (error) throw new Error(`Could not load your profile: ${errorMessage(error, 'Supabase rejected the request')}`);
   return data as ProfileRecord | null;
+}
+
+export async function updateCurrentProfile(input: {
+  display_name: string;
+  bio: string;
+  country: string;
+  area: string;
+  location: string;
+  date_of_birth: string | null;
+  links: string[];
+  avatar_url?: string | null;
+}) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to edit your profile.');
+  const { data, error } = await supabase.from('profiles').update({
+    display_name: input.display_name.trim(),
+    bio: input.bio.trim(),
+    country: input.country.trim() || null,
+    area: input.area.trim() || null,
+    location: input.location.trim() || null,
+    date_of_birth: input.date_of_birth || null,
+    links: input.links.filter(Boolean),
+    ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url } : {}),
+  }).eq('id', user.id).select().single();
+  if (error) throw new Error(`Profile update failed: ${errorMessage(error, 'Supabase rejected the profile')}`);
+  return data as ProfileRecord;
 }
 
 export async function createPost(body: string, media: MediaItem[]) {
@@ -320,6 +351,80 @@ export type ProductRecord = {
   store?: { id: string; name: string; owner_id: string } | null;
 };
 
+export async function createStore(input: { name: string; description: string; location?: string }) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to create your shop.');
+  const name = input.name.trim();
+  if (!name) throw new Error('Add a shop name first.');
+  const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shop';
+  const slug = `${baseSlug}-${user.id.replace(/-/g, '').slice(-6)}`;
+  const { data, error } = await supabase.from('stores').insert({
+    owner_id: user.id,
+    name,
+    slug,
+    description: input.description.trim(),
+  }).select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at').single();
+  if (error) throw new Error(`Shop creation failed: ${errorMessage(error, 'Supabase rejected the shop')}`);
+  return data;
+}
+
+export async function updateStore(storeId: string, input: { name: string; description: string }) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to edit your shop.');
+  const { data, error } = await supabase.from('stores').update({
+    name: input.name.trim(),
+    description: input.description.trim(),
+  }).eq('id', storeId).eq('owner_id', user.id).select().single();
+  if (error) throw new Error(`Shop update failed: ${errorMessage(error, 'Supabase rejected the shop')}`);
+  return data;
+}
+
+export async function createProduct(input: {
+  storeId: string;
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  stock: number;
+  fulfillment: string;
+  bidEnabled: boolean;
+  bidPrice: number | null;
+  media: MediaItem[];
+}) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to publish a product.');
+  if (!input.name.trim()) throw new Error('Add a product name.');
+  if (!Number.isFinite(input.price) || input.price < 0) throw new Error('Add a valid price.');
+  const uploadedPaths: string[] = [];
+  try {
+    const imageUrls: string[] = [];
+    for (const item of input.media) {
+      const uploaded = await uploadMedia(user.id, item, 'products');
+      uploadedPaths.push(uploaded.path);
+      imageUrls.push(uploaded.url);
+    }
+    const { data, error } = await supabase.from('products').insert({
+      store_id: input.storeId,
+      name: input.name.trim(),
+      description: input.description.trim(),
+      category: input.category.trim() || 'Beauty',
+      price: input.price,
+      stock: Math.max(0, Math.floor(input.stock)),
+      fulfillment: input.fulfillment,
+      image_urls: imageUrls,
+      attributes: {
+        bid_enabled: input.bidEnabled,
+        bid_price: input.bidEnabled ? input.bidPrice : null,
+      },
+    }).select().single();
+    if (error) throw new Error(`Product publish failed: ${errorMessage(error, 'Supabase rejected the product')}`);
+    return data as ProductRecord;
+  } catch (error) {
+    await removeUploadedMedia(uploadedPaths);
+    throw error;
+  }
+}
+
 export async function getProducts(
   limit = 50,
   options: { storeId?: string; category?: string; search?: string; productId?: string } = {},
@@ -352,7 +457,7 @@ export async function getStore(identifier: string) {
     if (!user) throw new Error('Please sign in to view your shop.');
     const result = await supabase
       .from('stores')
-      .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+    .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
       .eq('owner_id', user.id)
       .maybeSingle();
     store = result.data;
@@ -388,7 +493,7 @@ export async function getStore(identifier: string) {
   if (!store) return null;
   const { data: owner, error: ownerError } = await supabase
     .from('profiles')
-    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at')
+      .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links')
     .eq('id', store.owner_id)
     .maybeSingle();
   if (ownerError) throw new Error(`Could not load store owner: ${errorMessage(ownerError, 'Supabase rejected the request')}`);
