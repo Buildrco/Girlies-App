@@ -494,6 +494,14 @@ export async function createService(input: { name: string; description: string; 
   return data;
 }
 
+export async function getServices(ownerId?: string) {
+  let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,created_at').order('created_at', { ascending: false }).limit(80);
+  if (ownerId) query = query.eq('owner_id', ownerId);
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not load services: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return data || [];
+}
+
 export async function createProduct(input: {
   storeId: string;
   name: string;
