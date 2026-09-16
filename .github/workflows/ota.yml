@@ -26,12 +26,12 @@ jobs:
           cache-dependency-path: app/package-lock.json
 
       - name: Install app dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Verify Expo Router is installed
         run: node -e "require.resolve('expo-router/package.json'); console.log('expo-router OK')"
 
       - name: Publish Android OTA
-        run: npx eas-cli@latest update --platform android --channel preview --message "Girlies preview OTA update"
+        run: npx eas-cli@latest update --platform android --channel preview --message "Girlies preview OTA update" --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

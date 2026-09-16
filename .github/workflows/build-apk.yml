@@ -25,12 +25,15 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Build APK
-        run: npx eas-cli@latest build --platform android --profile preview --non-interactive --wait
+        run: npx eas-cli@latest build --platform android --profile preview --non-interactive --wait --json > eas-build.json
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Download APK
-        run: npx eas-cli@latest build:download --latest --platform android --profile preview --output girlies-preview.apk --non-interactive
+        run: |
+          BUILD_URL=$(node -e "const fs=require('fs'); const value=JSON.parse(fs.readFileSync('eas-build.json','utf8')); const build=Array.isArray(value)?value[0]:value; process.stdout.write(build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || '');")
+          test -n "$BUILD_URL"
+          npx eas-cli@latest build:download --url "$BUILD_URL" --output girlies-preview.apk --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
