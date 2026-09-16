@@ -95,6 +95,30 @@ export async function getSessionUser() {
   return data.session?.user ?? null;
 }
 
+export type ProfileRecord = {
+  id: string;
+  display_name: string;
+  handle: string;
+  bio: string | null;
+  avatar_url: string | null;
+  verified: boolean;
+  followers_count: number;
+  following_count: number;
+  created_at: string;
+};
+
+export async function getCurrentProfile(): Promise<ProfileRecord | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not load your profile: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return data as ProfileRecord | null;
+}
+
 export async function createPost(body: string, media: MediaItem[]) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to post.');
@@ -279,6 +303,88 @@ export async function markStoryViewed(storyId: string) {
   }
 }
 
+export type ProductRecord = {
+  id: string;
+  store_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  price: number;
+  currency: string;
+  stock: number;
+  fulfillment: string;
+  estimated_arrival: string | null;
+  image_urls: string[];
+  attributes: Record<string, unknown>;
+  created_at: string;
+  store?: { id: string; name: string; owner_id: string } | null;
+};
+
+export async function getProducts(
+  limit = 50,
+  options: { storeId?: string; category?: string; search?: string } = {},
+): Promise<ProductRecord[]> {
+  let query = supabase
+    .from('products')
+    .select('id,store_id,name,description,category,price,currency,stock,fulfillment,estimated_arrival,image_urls,attributes,created_at,stores(id,name,owner_id)')
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, limit));
+  if (options.storeId) query = query.eq('store_id', options.storeId);
+  if (options.category) query = query.ilike('category', options.category);
+  if (options.search?.trim()) query = query.ilike('name', `%${options.search.trim()}%`);
+  const { data, error } = await query;
+  if (error) throw new Error(`Could not load products: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return (data || []).map((row: any) => ({
+    ...row,
+    image_urls: Array.isArray(row.image_urls) ? row.image_urls : [],
+    attributes: row.attributes && typeof row.attributes === 'object' ? row.attributes : {},
+    store: Array.isArray(row.stores) ? row.stores[0] || null : row.stores || null,
+  })) as ProductRecord[];
+}
+
+export async function getStore(identifier: string) {
+  if (!identifier) return null;
+  let store: any = null;
+  let storeError: unknown = null;
+  if (identifier === 'me') {
+    const user = await getSessionUser();
+    if (!user) throw new Error('Please sign in to view your shop.');
+    const result = await supabase
+      .from('stores')
+      .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+    store = result.data;
+    storeError = result.error;
+  } else {
+    const bySlug = await supabase
+      .from('stores')
+      .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+      .eq('slug', identifier)
+      .maybeSingle();
+    store = bySlug.data;
+    storeError = bySlug.error;
+    if (!store && !storeError) {
+      const byId = await supabase
+        .from('stores')
+        .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+        .eq('id', identifier)
+        .maybeSingle();
+      store = byId.data;
+      storeError = byId.error;
+    }
+  }
+  if (storeError) throw new Error(`Could not load store: ${errorMessage(storeError, 'Supabase rejected the request')}`);
+  if (!store) return null;
+  const { data: owner, error: ownerError } = await supabase
+    .from('profiles')
+    .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at')
+    .eq('id', store.owner_id)
+    .maybeSingle();
+  if (ownerError) throw new Error(`Could not load store owner: ${errorMessage(ownerError, 'Supabase rejected the request')}`);
+  return { ...store, owner };
+}
+
 
 export type ChatSummary = {
   id: string;
@@ -290,6 +396,40 @@ export type ChatSummary = {
   unread: number;
   otherUserId: string | null;
 };
+
+export type ChatMessage = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string | null;
+  media: Record<string, unknown> | null;
+  created_at: string;
+  status: string | null;
+};
+
+async function requireConversationMember(conversationId: string, userId: string) {
+  const { data, error } = await supabase
+    .from('conversation_members')
+    .select('conversation_id')
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(`Could not verify conversation access: ${errorMessage(error, 'Supabase rejected the request')}`);
+  if (!data) throw new Error('You are not a member of this conversation.');
+}
+
+export async function getMessages(conversationId: string): Promise<ChatMessage[]> {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in.');
+  await requireConversationMember(conversationId, me.id);
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id,conversation_id,sender_id,body,media,created_at,status')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(`Could not load messages: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return (data || []) as ChatMessage[];
+}
 
 export async function getChatSummaries(): Promise<ChatSummary[]> {
   const me = await getSessionUser();
@@ -416,10 +556,7 @@ export async function createDirectConversation(otherUserId: string) {
 export async function getConversation(id: string) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in.');
-  const { data: membership, error: membershipError } = await supabase
-    .from('conversation_members').select('conversation_id').eq('conversation_id', id).eq('user_id', me.id).maybeSingle();
-  if (membershipError) throw new Error(`Could not open conversation: ${errorMessage(membershipError, 'Supabase rejected the request')}`);
-  if (!membership) throw new Error('You are not a member of this conversation.');
+  await requireConversationMember(id, me.id);
 
   const { data: members, error: membersError } = await supabase
     .from('conversation_members').select('user_id').eq('conversation_id', id);
@@ -431,10 +568,8 @@ export async function getConversation(id: string) {
     if (result.error) throw new Error(`Could not load profile: ${errorMessage(result.error, 'Supabase rejected the request')}`);
     profile = result.data;
   }
-  const { data: messages, error: messagesError } = await supabase
-    .from('messages').select('id,sender_id,body,media,created_at,status').eq('conversation_id', id).order('created_at', { ascending: true });
-  if (messagesError) throw new Error(`Could not load messages: ${errorMessage(messagesError, 'Supabase rejected the request')}`);
-  return { meId: me.id, otherId, profile, messages: messages || [] };
+  const messages = await getMessages(id);
+  return { meId: me.id, otherId, other: profile, profile, messages };
 }
 
 export async function sendMessage(conversationId: string, body: string) {
@@ -449,5 +584,5 @@ export async function sendMessage(conversationId: string, body: string) {
     status: 'sent',
   }).select('id,sender_id,body,media,created_at,status').single();
   if (error) throw new Error(`Message failed: ${errorMessage(error, 'Supabase rejected the message')}`);
-  return data;
+  return data as ChatMessage;
 }

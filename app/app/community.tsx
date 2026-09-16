@@ -91,15 +91,16 @@ export default function Community() {
     const postIds=postRows.map(post=>post.id);
     if (!postIds.length) return;
     try {
-      const countsByPost=await withTimeout(Promise.all(postIds.map(async postId=>{
-        const {count,error}=await withTimeout(Promise.resolve(
-          supabase.from('post_likes').select('post_id',{count:'exact',head:true}).eq('post_id',postId)
-        ));
-        if (error) throw error;
-        return [postId,typeof count==='number'?count:0] as const;
-      })));
+      const {data,error}=await withTimeout(Promise.resolve(
+        supabase.from('post_likes').select('post_id').in('post_id',postIds)
+      ));
+      if (error) throw error;
       if (!isCurrentFocus(generation)) return;
-      const counts=Object.fromEntries(countsByPost) as Record<string,number>;
+      const counts=postIds.reduce((result:any,postId:string) => {
+        result[postId]=0;
+        return result;
+      }, {} as Record<string,number>);
+      (data||[]).forEach((row:any) => { counts[row.post_id]=(counts[row.post_id]||0)+1; });
       setLikeCounts(counts);
       setPosts(current=>current.map(post=>({...post,like_count:counts[post.id]||0})));
     } catch(e) {

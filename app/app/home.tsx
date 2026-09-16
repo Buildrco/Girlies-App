@@ -12,7 +12,7 @@ import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
-import { getPostLikeState, getSessionUser, setFollow, setPostLike } from '../lib/social';
+import { getPostLikeState, getProducts, getSessionUser, setFollow, setPostLike, type ProductRecord } from '../lib/social';
 
 type HomePost = {
   id: string;
@@ -21,6 +21,15 @@ type HomePost = {
   media_urls: string[];
   created_at: string;
   profile?: { display_name: string; handle: string; avatar_url: string | null; verified: boolean };
+};
+
+type SellerProfile = {
+  id: string;
+  display_name: string;
+  handle: string;
+  avatar_url: string | null;
+  verified: boolean;
+  followers_count: number;
 };
 
 const imgs = [
@@ -37,9 +46,10 @@ export default function Home() {
   const [hero, setHero] = useState(0);
   const [followed, setFollowed] = useState<Set<number>>(new Set());
   const [sellerIds, setSellerIds] = useState<(string | null)[]>([]);
+  const [sellerProfiles, setSellerProfiles] = useState<SellerProfile[]>([]);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [followingBusy, setFollowingBusy] = useState<Set<number>>(new Set());
-  const [productIds, setProductIds] = useState<string[]>([]);
+  const [products, setProducts] = useState<ProductRecord[]>([]);
   const [homePostId, setHomePostId] = useState<string | null>(null);
   const [homePost, setHomePost] = useState<HomePost | null>(null);
   const [liked, setLiked] = useState(false);
@@ -47,8 +57,6 @@ export default function Home() {
   const [homeCommentCount, setHomeCommentCount] = useState(0);
   const [homeShareCount, setHomeShareCount] = useState(0);
   const [likeBusy, setLikeBusy] = useState(false);
-  const sellers = ['Nia Hair', 'Amara Beauty', 'Glow Room', 'The Bag Edit', 'Scent Lab'];
-
   useFocusEffect(useCallback(() => {
     let active = true;
     async function loadLiveState() {
@@ -57,16 +65,17 @@ export default function Home() {
         if (!active) return;
         setSessionUserId(me?.id || null);
         const [profilesResult, productsResult, postResult] = await Promise.all([
-          supabase.from('profiles').select('id').order('created_at', { ascending: true }).limit(sellers.length),
-          supabase.from('products').select('id').order('created_at', { ascending: false }).limit(sellers.length),
+          supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count').order('created_at', { ascending: true }).limit(5),
+          getProducts(5),
           supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
         ]);
         if (profilesResult.error) throw profilesResult.error;
-        if (productsResult.error) throw productsResult.error;
         if (postResult.error) throw postResult.error;
-        const liveSellerIds = (profilesResult.data || []).map(row => row.id);
+        const liveSellers = (profilesResult.data || []) as SellerProfile[];
+        const liveSellerIds = liveSellers.map(row => row.id);
+        setSellerProfiles(liveSellers);
         setSellerIds(liveSellerIds);
-        setProductIds((productsResult.data || []).map(row => row.id));
+        setProducts(productsResult);
         const post = postResult.data?.[0] || null;
         const postId = post?.id || null;
         setHomePostId(postId);
@@ -147,10 +156,10 @@ export default function Home() {
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
       <View><CurvedBanner image={imgs[hero]} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][hero]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][hero]} color={[C.rose, C.sun, C.lilac][hero]} onPress={() => router.push('/shop')} /><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
       <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>
-      <SectionTitle title="Popular sellers" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellers.map((name, index) => <Pressable key={name} onPress={() => router.push('/seller/' + index)} style={s.seller}><Avatar size={54} index={index} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{name}</Text><VerifiedMark size={17} /></View><Text style={s.sellerMeta}>{[12.4, 8.3, 6.8, 5.1, 4.7][index]}k followers</Text><Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
+       <SectionTitle title="Popular sellers" />
+       <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellerProfiles.map((seller, index) => <Pressable key={seller.id} onPress={() => router.push('/seller/' + seller.id)} style={s.seller}><Avatar size={54} index={index} uri={seller.avatar_url} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{seller.display_name}</Text>{seller.verified && <VerifiedMark size={17} />}</View><Text style={s.sellerMeta}>{seller.followers_count || 0} followers</Text><Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable></Pressable>)}</ScrollView>
       <SectionTitle title="Popular products" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>{['Silk press wig', 'Rose oud perfume', 'Everyday tote', 'Glow kit', 'Satin set'].map((name, index) => <ProductCard key={name} productId={productIds[index]} name={name} price={'GH₵ ' + [480, 320, 260, 190, 150][index]} image={imgs[(index + 1) % imgs.length]} seller={['Nia Hair', 'Scent Lab', 'Amara Store', 'Glow Room', 'Nia Closet'][index]} onPress={() => router.push({ pathname: '/product', params: { id: String(index) } })} />)}</ScrollView>
+       <ScrollView horizontal showsHorizontalScrollIndicator={false}>{products.map(product => <ProductCard key={product.id} productId={product.id} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</ScrollView>
       <View style={s.editorial}><Image source={{ uri: imgs[3] }} style={s.editorialImg} /><View style={s.editorialText}><Text style={s.editorialK}>THE GIRLIE GUIDE</Text><Text style={s.editorialTitle}>Good taste is better when shared.</Text><Text style={s.editorialSub}>Save a look. Ask the community. Find the shop. Make it yours.</Text><Pressable onPress={() => router.push('/community')} style={s.darkBtn}><Text style={{ color: '#FFF', fontWeight: '900' }}>See what girls are saying</Text></Pressable></View></View>
       <SectionTitle title="Fresh on the feed" />
        {homePost && <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={homePost.profile?.avatar_url} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>{homePost.profile?.display_name || 'Girlie'}</Text>{homePost.profile?.verified && <VerifiedMark size={15} />}</View><Text style={s.postMeta}>@{homePost.profile?.handle || 'girlie'} · {new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted} /></View>{!!homePost.body && <Text style={s.postText}>{homePost.body}</Text>}{homePost.media_urls[0] && <Image source={{ uri: homePost.media_urls[0] }} style={s.postImg} />}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> {homeCommentCount}</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> {homeShareCount}</Text></View></View></Pressable>}
