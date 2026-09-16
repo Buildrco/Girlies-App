@@ -10,6 +10,23 @@ create table if not exists messages(id uuid primary key default gen_random_uuid(
 create table if not exists orders(id uuid primary key default gen_random_uuid(), buyer_id uuid references profiles(id), store_id uuid references stores(id), product_id uuid references products(id), quantity int not null, subtotal numeric(12,2) not null, delivery_fee numeric(12,2), address jsonb not null, payment_reference text unique, payment_status text default 'pending', fulfillment_status text default 'awaiting_payment', created_at timestamptz default now());
 create table if not exists bids(id uuid primary key default gen_random_uuid(), product_id uuid references products(id), bidder_id uuid references profiles(id), amount numeric(12,2) not null, created_at timestamptz default now());
 create index if not exists products_category_idx on products(category); create index if not exists products_store_idx on products(store_id); create index if not exists posts_author_idx on posts(author_id); create index if not exists messages_conversation_idx on messages(conversation_id); create index if not exists orders_buyer_idx on orders(buyer_id);
+alter table products add column if not exists stock_status text default 'in_stock';
+alter table products add column if not exists gender text default 'all';
+alter table products add column if not exists filters jsonb default '{}';
+alter table products add column if not exists delivery_options text[] default '{}';
+alter table products add column if not exists bid_min_price numeric(12,2);
+alter table products add column if not exists bid_ends_at timestamptz;
+create table if not exists services(id uuid primary key default gen_random_uuid(), owner_id uuid references profiles(id) on delete cascade, name text not null, description text default '', category text not null, price numeric(12,2) not null default 0, duration_minutes int default 60, delivery_options text[] default '{}', filters jsonb default '{}', created_at timestamptz default now());
+create index if not exists services_owner_idx on services(owner_id);
+alter table services enable row level security;
+drop policy if exists services_read on services;
+create policy services_read on services for select using (true);
+drop policy if exists services_insert_own on services;
+create policy services_insert_own on services for insert with check (auth.uid() = owner_id);
+drop policy if exists services_update_own on services;
+create policy services_update_own on services for update using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+drop policy if exists services_delete_own on services;
+create policy services_delete_own on services for delete using (auth.uid() = owner_id);
 
 create table if not exists stories(id uuid primary key default gen_random_uuid(), user_id uuid not null references profiles(id) on delete cascade, media_url text not null, media_type text not null default 'image', caption text default '', created_at timestamptz default now(), expires_at timestamptz default (now() + interval '24 hours'));
 create table if not exists story_views(story_id uuid not null references stories(id) on delete cascade, user_id uuid not null references profiles(id) on delete cascade, viewed_at timestamptz default now(), primary key(story_id,user_id));
@@ -30,6 +47,12 @@ create index if not exists bookmarks_user_idx on bookmarks(user_id);
 create index if not exists product_likes_user_idx on product_likes(user_id);
 create index if not exists post_shares_post_idx on post_shares(post_id,created_at);
 create index if not exists post_shares_user_idx on post_shares(user_id);
+alter table bids enable row level security;
+drop policy if exists bids_read on bids;
+create policy bids_read on bids for select using (true);
+drop policy if exists bids_insert_own on bids;
+create policy bids_insert_own on bids for insert with check (auth.uid() = bidder_id);
+create index if not exists bids_product_amount_idx on bids(product_id, amount desc);
 
 alter table profiles enable row level security;
 alter table stores enable row level security;

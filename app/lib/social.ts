@@ -231,6 +231,17 @@ export async function getAreas(country: string): Promise<string[]> {
     .sort((a: string, b: string) => a.localeCompare(b));
 }
 
+export async function getCities(country: string, state: string): Promise<string[]> {
+  const response = await fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ country, state }),
+  });
+  if (!response.ok) throw new Error('Could not load towns for this area.');
+  const payload = await response.json();
+  return (payload.data || []).map((town: unknown) => String(town || '')).filter(Boolean).sort((a: string, b: string) => a.localeCompare(b));
+}
+
 export async function createPost(body: string, media: MediaItem[]) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to post.');
@@ -428,6 +439,12 @@ export type ProductRecord = {
   estimated_arrival: string | null;
   image_urls: string[];
   attributes: Record<string, unknown>;
+  stock_status?: 'in_stock' | 'out_of_stock';
+  gender?: string | null;
+  filters?: Record<string, unknown>;
+  delivery_options?: string[];
+  bid_min_price?: number | null;
+  bid_ends_at?: string | null;
   created_at: string;
   store?: { id: string; name: string; owner_id: string } | null;
 };
@@ -460,6 +477,23 @@ export async function updateStore(storeId: string, input: { name: string; descri
   return data;
 }
 
+export async function createService(input: { name: string; description: string; category: string; price: number; durationMinutes: number; deliveryOptions: string[]; filters: Record<string, unknown> }) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to publish a service.');
+  const { data, error } = await supabase.from('services').insert({
+    owner_id: user.id,
+    name: input.name.trim(),
+    description: input.description.trim(),
+    category: input.category.trim(),
+    price: input.price,
+    duration_minutes: input.durationMinutes,
+    delivery_options: input.deliveryOptions,
+    filters: input.filters,
+  }).select().single();
+  if (error) throw new Error(`Service publish failed: ${errorMessage(error, 'Supabase rejected the service')}`);
+  return data;
+}
+
 export async function createProduct(input: {
   storeId: string;
   name: string;
@@ -471,6 +505,11 @@ export async function createProduct(input: {
   bidEnabled: boolean;
   bidPrice: number | null;
   media: MediaItem[];
+  stockStatus?: 'in_stock' | 'out_of_stock';
+  gender?: string;
+  filters?: Record<string, unknown>;
+  deliveryOptions?: string[];
+  bidEndsAt?: string | null;
 }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to publish a product.');
@@ -491,7 +530,13 @@ export async function createProduct(input: {
       category: input.category.trim() || 'Beauty',
       price: input.price,
       stock: Math.max(0, Math.floor(input.stock)),
+      stock_status: input.stockStatus || (input.stock > 0 ? 'in_stock' : 'out_of_stock'),
       fulfillment: input.fulfillment,
+      gender: input.gender || 'all',
+      filters: input.filters || {},
+      delivery_options: input.deliveryOptions || [],
+      bid_min_price: input.bidEnabled ? input.bidPrice : null,
+      bid_ends_at: input.bidEnabled ? input.bidEndsAt || null : null,
       image_urls: imageUrls,
       attributes: {
         bid_enabled: input.bidEnabled,
@@ -506,13 +551,64 @@ export async function createProduct(input: {
   }
 }
 
+export async function updateProduct(productId: string, input: {
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  stock: number;
+  stockStatus: 'in_stock' | 'out_of_stock';
+  fulfillment: string;
+  bidEnabled: boolean;
+  bidPrice: number | null;
+  bidEndsAt: string | null;
+  gender: string;
+  filters: Record<string, unknown>;
+  deliveryOptions: string[];
+  media: MediaItem[];
+  existingImageUrls: string[];
+}) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to edit a product.');
+  const uploadedPaths: string[] = [];
+  try {
+    const imageUrls = [...input.existingImageUrls];
+    for (const item of input.media) {
+      const uploaded = await uploadMedia(user.id, item, 'products');
+      uploadedPaths.push(uploaded.path);
+      imageUrls.push(uploaded.url);
+    }
+    const { data, error } = await supabase.from('products').update({
+      name: input.name.trim(),
+      description: input.description.trim(),
+      category: input.category.trim() || 'Beauty',
+      price: input.price,
+      stock: Math.max(0, Math.floor(input.stock)),
+      stock_status: input.stockStatus,
+      fulfillment: input.fulfillment,
+      gender: input.gender || 'all',
+      filters: input.filters,
+      delivery_options: input.deliveryOptions,
+      bid_min_price: input.bidEnabled ? input.bidPrice : null,
+      bid_ends_at: input.bidEnabled ? input.bidEndsAt : null,
+      image_urls: imageUrls.slice(0, 4),
+      attributes: { bid_enabled: input.bidEnabled, bid_price: input.bidEnabled ? input.bidPrice : null },
+    }).eq('id', productId).select().single();
+    if (error) throw new Error(`Product update failed: ${errorMessage(error, 'Supabase rejected the product')}`);
+    return data as ProductRecord;
+  } catch (error) {
+    await removeUploadedMedia(uploadedPaths);
+    throw error;
+  }
+}
+
 export async function getProducts(
   limit = 50,
   options: { storeId?: string; category?: string; search?: string; productId?: string } = {},
 ): Promise<ProductRecord[]> {
   let query = supabase
     .from('products')
-    .select('id,store_id,name,description,category,price,currency,stock,fulfillment,estimated_arrival,image_urls,attributes,created_at,stores(id,name,owner_id)')
+    .select('id,store_id,name,description,category,price,currency,stock,stock_status,gender,filters,delivery_options,bid_min_price,bid_ends_at,fulfillment,estimated_arrival,image_urls,attributes,created_at,stores(id,name,owner_id)')
     .order('created_at', { ascending: false })
     .limit(Math.max(1, limit));
   if (options.storeId) query = query.eq('store_id', options.storeId);
