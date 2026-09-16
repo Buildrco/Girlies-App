@@ -322,7 +322,7 @@ export type ProductRecord = {
 
 export async function getProducts(
   limit = 50,
-  options: { storeId?: string; category?: string; search?: string } = {},
+  options: { storeId?: string; category?: string; search?: string; productId?: string } = {},
 ): Promise<ProductRecord[]> {
   let query = supabase
     .from('products')
@@ -330,6 +330,7 @@ export async function getProducts(
     .order('created_at', { ascending: false })
     .limit(Math.max(1, limit));
   if (options.storeId) query = query.eq('store_id', options.storeId);
+  if (options.productId) query = query.eq('id', options.productId);
   if (options.category) query = query.ilike('category', options.category);
   if (options.search?.trim()) query = query.ilike('name', `%${options.search.trim()}%`);
   const { data, error } = await query;
@@ -372,6 +373,15 @@ export async function getStore(identifier: string) {
         .maybeSingle();
       store = byId.data;
       storeError = byId.error;
+    }
+    if (!store && !storeError) {
+      const byOwner = await supabase
+        .from('stores')
+        .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+        .eq('owner_id', identifier)
+        .maybeSingle();
+      store = byOwner.data;
+      storeError = byOwner.error;
     }
   }
   if (storeError) throw new Error(`Could not load store: ${errorMessage(storeError, 'Supabase rejected the request')}`);
