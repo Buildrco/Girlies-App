@@ -1,3 +1,44 @@
-import React from'react';import{SafeAreaView}from'react-native-safe-area-context';import{ScrollView,View,Text,Pressable,StyleSheet}from'react-native';import{useRouter}from'expo-router';import{C}from'../constants/theme';import{I}from'../components/Icons';import{Avatar}from'../Avatar';
-export default function Notifications(){const r=useRouter();return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.scroll}><View style={s.top}><Pressable onPress={()=>r.back()}><I name="back" size={34}/></Pressable><Text style={s.h}>Notifications</Text><Pressable><Text style={s.read}>Read all</Text></Pressable></View>{[['Nana Glow','liked your post','2m'],['Nia Hair','posted a new drop','18m'],['Wedding girls','mentioned you in a group','1h'],['Your order','Rider has been assigned','2h'],['Lumi','found 6 products matching your saved taste','4h'],['Amara Beauty','followed you','Yesterday']].map((x,i)=><Pressable key={i} onPress={()=>i===3&&r.push('/orders')} style={[s.row,i<3&&s.new]}><Avatar size={46} index={i} verified={i!==4}/><View style={{flex:1}}><Text style={s.text}><Text style={{fontWeight:'900'}}>{x[0]}</Text> {x[1]}</Text><Text style={s.time}>{x[2]}</Text></View>{i<3&&<View style={s.unread}/>}</Pressable>)}</ScrollView></SafeAreaView>}
-const s=StyleSheet.create({safe:{flex:1,backgroundColor:C.bg},scroll:{padding:18},top:{height:55,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},h:{fontSize:20,fontWeight:'900'},read:{fontSize:11,fontWeight:'900',color:C.plum},row:{paddingVertical:14,flexDirection:'row',alignItems:'center',gap:11,borderBottomWidth:1,borderBottomColor:C.line},new:{backgroundColor:'#FFF',marginHorizontal:-8,paddingHorizontal:8,borderRadius:18},text:{fontSize:12,lineHeight:17},time:{fontSize:10,color:C.muted,marginTop:3},unread:{width:8,height:8,borderRadius:4,backgroundColor:C.pink}})
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { C } from '../constants/theme';
+import { I } from '../components/Icons';
+import { getSessionUser } from '../lib/social';
+
+export default function Notifications() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getSessionUser().then(user => {
+      if (active) {
+        setSignedIn(Boolean(user));
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  return <SafeAreaView style={s.safe}>
+    <ScrollView contentContainerStyle={s.scroll}>
+      <View style={s.top}><Pressable onPress={() => router.back()}><I name="back" size={34} /></Pressable><Text style={s.h}>Notifications</Text><View style={{ width: 45 }} /></View>
+      {loading ? <View style={s.state}><ActivityIndicator color={C.pink} /></View> : !signedIn ? <View style={s.state}><Text style={s.title}>Sign in to see notifications</Text><Text style={s.muted}>Activity for your account will appear here.</Text><Pressable onPress={() => router.push('/login')} style={s.button}><Text style={s.buttonText}>Sign in</Text></Pressable></View> : <View style={s.state}><Text style={{ fontSize: 40 }}>✦</Text><Text style={s.title}>You’re all caught up</Text><Text style={s.muted}>New activity will appear here when someone follows, likes or messages you.</Text></View>}
+    </ScrollView>
+  </SafeAreaView>;
+}
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bg },
+  scroll: { padding: 18 },
+  top: { height: 55, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  h: { fontSize: 20, fontWeight: '900' },
+  state: { marginTop: 55, padding: 26, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', borderWidth: 1, borderColor: C.line },
+  title: { fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 8 },
+  muted: { fontSize: 12, lineHeight: 18, color: C.muted, textAlign: 'center', marginTop: 6 },
+  button: { marginTop: 16, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 22, backgroundColor: C.ink },
+  buttonText: { color: '#FFF', fontWeight: '900' },
+});
