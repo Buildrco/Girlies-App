@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../constants/theme';
@@ -16,9 +15,8 @@ function profileMediaType(post: Post, url: string, index: number): 'image' | 'vi
   const typed = post.metadata?.media_types?.[index] || post.metadata?.media?.[index]?.type;
   return typed === 'video' || (!typed && PROFILE_VIDEO_URL.test(url)) ? 'video' : 'image';
 }
-function ProfileVideo({ url, style }: { url: string; style: any }) {
-  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = false; currentPlayer.play(); });
-  return <VideoView player={player} style={style} nativeControls={false} contentFit="cover" />;
+function ProfileVideo({ url: _url, style }: { url: string; style: any }) {
+  return <View style={[style, { backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#FFF', fontWeight: '900' }}>Video preview</Text></View>;
 }
 
 export default function UserProfile() {
