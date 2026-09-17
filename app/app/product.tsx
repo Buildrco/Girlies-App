@@ -6,7 +6,7 @@ import{C}from'../constants/theme';
 import{I}from'../components/Icons';
 import{Avatar,VerifiedMark}from'../Avatar';
 import{LikeButton}from'../components/LikeButton';
-import{getProductLikeState,setProductLike,getSessionUser,setFollow}from'../lib/social';
+import{getProductLikeState,setProductLike,getSessionUser,setFollow,normalizeImageUrls}from'../lib/social';
 import{supabase}from'../lib/supabase';
 
 type Product={id:string;name:string;description?:string;category?:string;price:number;currency?:string;stock?:number;fulfillment?:string;estimated_arrival?:string;image_urls?:string[];attributes?:any;store_id:string};
@@ -16,7 +16,8 @@ export default function Product(){
  const router=useRouter();const{id}=useLocalSearchParams<{id?:string}>();const productId=normalizeId(id);
  const[product,setProduct]=useState<Product|null>(null);const[seller,setSeller]=useState<Seller|null>(null);const[saved,setSaved]=useState(false);const[following,setFollowing]=useState(false);const[loading,setLoading]=useState(true);const[error,setError]=useState('');
  useEffect(()=>{let mounted=true;(async()=>{if(!productId){if(mounted){setError('Product could not be loaded.');setLoading(false);}return;}try{
-   const{data:p,error:pError}=await supabase.from('products').select('id,name,description,category,price,currency,stock,fulfillment,estimated_arrival,image_urls,attributes,store_id').eq('id',productId).maybeSingle();
+   setLoading(true);setProduct(null);setSeller(null);setError('');
+    const{data:p,error:pError}=await supabase.from('products').select('id,name,description,category,price,currency,stock,fulfillment,estimated_arrival,image_urls,attributes,store_id').eq('id',productId).maybeSingle();
    if(pError)throw pError;if(!p){setError('This listing is no longer available.');return;}if(!mounted)return;setProduct(p as Product);
    const{data:store,error:storeError}=await supabase.from('stores').select('owner_id,name,rating,lat,lng,verification_status').eq('id',p.store_id).maybeSingle();
    if(storeError)throw storeError;
