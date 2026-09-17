@@ -67,7 +67,7 @@ export default function ProductEditor() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert('Permission needed', 'Allow Girlies to access your photos so you can add product images.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.9 });
-    if (!result.canceled) setMedia(current => [...current, ...result.assets.slice(0, Math.max(0, 4 - existingImages.length - current.length)).map(asset => ({ uri: asset.uri, type: 'image', name: asset.fileName || 'product.jpg', mimeType: asset.mimeType || 'image/jpeg' }))]);
+    if (!result.canceled) setMedia(current => [...current, ...result.assets.slice(0, Math.max(0, 4 - existingImages.length - current.length)).map(asset => ({ uri: asset.uri, type: 'image' as const, name: asset.fileName || 'product.jpg', mimeType: asset.mimeType || 'image/jpeg' }))]);
   }
 
   const toggle = (value: string, values: string[], setValues: (next: string[]) => void) => setValues(values.includes(value) ? values.filter(item => item !== value) : [...values, value]);
