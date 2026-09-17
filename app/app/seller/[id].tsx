@@ -288,7 +288,7 @@ export default function Seller() {
         )}
         <View style={s.tabs}><Text style={s.active}>Shop</Text><Text>Posts</Text><Text>About</Text></View>
         <View style={s.grid}>
-          {products.map((product: any) => <ProductCard key={product.id} gridWidth="48%" productId={product.id} name={product.name} price={'GH₵ ' + Number(product.price).toFixed(0)} image={product.image_urls?.[0] || ''} seller={owner?.display_name || store.name} verified={Boolean(owner?.verified || store.verification_status === 'verified')} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}
+          {products.map((product: any) => <ProductCard key={product.id} gridWidth="48%" productId={product.id} images={product.image_urls} name={product.name} price={'GH₵ ' + Number(product.price).toFixed(0)} image={product.image_urls?.[0] || ''} seller={owner?.display_name || store.name} verified={Boolean(owner?.verified || store.verification_status === 'verified')} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}
         </View>
         {!products.length && <View style={s.empty}><Text style={{ fontSize: 30 }}>✦</Text><Text style={s.emptyTitle}>No products yet</Text><Text style={s.meta}>This seller has not published a live product.</Text></View>}
       </ScrollView>
