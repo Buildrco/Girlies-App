@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -21,7 +22,20 @@ type HomePost = {
   media_urls: string[];
   created_at: string;
   profile?: { display_name: string; handle: string; avatar_url: string | null; verified: boolean };
+  metadata?: any;
 };
+
+const VIDEO_URL_PATTERN = /\.(mp4|mov|m4v|webm|m3u8)(?:[?#]|$)/i;
+function getMediaType(post: HomePost, url: string, index: number): 'image' | 'video' {
+  const typed = post.metadata?.media_types?.[index] || post.metadata?.media?.[index]?.type;
+  if (typed === 'video' || typed === 'image') return typed;
+  return VIDEO_URL_PATTERN.test(url) ? 'video' : 'image';
+}
+function HomeVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
+  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = false; if (autoplay) currentPlayer.play(); });
+  useEffect(() => { if (autoplay) player.play(); else player.pause(); }, [autoplay, player]);
+  return <VideoView player={player} style={s.postImg} nativeControls={false} contentFit="cover" />;
+}
 
 type SellerProfile = {
   id: string;
@@ -74,7 +88,7 @@ export default function Home() {
         getCurrentProfile().catch(() => null),
         supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count,country,area,location').order('created_at', { ascending: true }).limit(5).then(result => result.data || [], () => []),
         getProducts(5).catch(() => []),
-        supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null, () => null),
+        supabase.from('posts').select('id,author_id,body,media_urls,metadata,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null, () => null),
       ]);
       if (!active) return;
       const liveSellers = profilesResult as SellerProfile[];
@@ -142,10 +156,10 @@ export default function Home() {
        <SectionTitle title="Popular sellers" onPress={() => router.push('/shop')} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellerProfiles.map((seller, index) => { const isMe = seller.id === sessionUserId; const place = [seller.area && seller.location ? `${seller.area} - ${seller.location}` : seller.area || seller.location, seller.country].filter(Boolean).join(', '); return <Pressable key={seller.id} onPress={() => router.push('/seller/' + seller.id)} style={s.seller}><Avatar size={54} index={index} uri={seller.avatar_url} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{seller.display_name}</Text>{seller.verified && <VerifiedMark size={17} />}</View><Text style={s.sellerHandle}>@{seller.handle}</Text><Text style={s.sellerMeta}>{place || 'Location not added'}</Text><Text style={s.sellerMeta}>{(seller.followers_count || 0).toLocaleString()} followers</Text>{!isMe && <Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable>}</Pressable>; })}</ScrollView>
       <SectionTitle title="Popular products" onPress={() => router.push('/shop')} />
-       <ScrollView horizontal showsHorizontalScrollIndicator={false}>{products.map(product => <ProductCard key={product.id} productId={product.id} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</ScrollView>
+       <ScrollView horizontal showsHorizontalScrollIndicator={false}>{products.map(product => <ProductCard key={product.id} productId={product.id} images={product.image_urls} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</ScrollView>
       <View style={s.editorial}><Image source={{ uri: imgs[3] }} style={s.editorialImg} /><View style={s.editorialText}><Text style={s.editorialK}>THE GIRLIE GUIDE</Text><Text style={s.editorialTitle}>Good taste is better when shared.</Text><Text style={s.editorialSub}>Save a look. Ask the community. Find the shop. Make it yours.</Text><Pressable onPress={() => router.push('/community')} style={s.darkBtn}><Text style={{ color: '#FFF', fontWeight: '900' }}>See what girls are saying</Text></Pressable></View></View>
       <SectionTitle title="Fresh on the feed" onPress={() => router.push('/community')} />
-       {homePost && <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={homePost.profile?.avatar_url} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>{homePost.profile?.display_name || 'Girlie'}</Text>{homePost.profile?.verified && <VerifiedMark size={15} />}</View><Text style={s.postMeta}>@{homePost.profile?.handle || 'girlie'} · {new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted} /></View>{!!homePost.body && <Text style={s.postText}>{homePost.body}</Text>}{homePost.media_urls[0] && <Image source={{ uri: homePost.media_urls[0] }} style={s.postImg} />}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> {homeCommentCount}</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> {homeShareCount}</Text></View></View></Pressable>}
+       {homePost && <Pressable onPress={() => router.push('/community')} style={s.post}><View style={s.postTop}><Avatar size={42} uri={homePost.profile?.avatar_url} index={2} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}><Text style={s.postUser}>{homePost.profile?.display_name || 'Girlie'}</Text>{homePost.profile?.verified && <VerifiedMark size={15} />}</View><Text style={s.postMeta}>@{homePost.profile?.handle || 'girlie'} · {new Date(homePost.created_at).toLocaleDateString()}</Text></View><I name="more" size={20} color={C.muted} /></View>{!!homePost.body && <Text style={s.postText}>{homePost.body}</Text>}{homePost.media_urls[0] && (getMediaType(homePost, homePost.media_urls[0], 0) === 'video' ? <HomeVideo url={homePost.media_urls[0]} autoplay={currentProfile?.video_autoplay !== false} /> : <Image source={{ uri: homePost.media_urls[0] }} style={s.postImg} />)}<View style={s.postFoot}><View style={s.postAction}><LikeButton liked={liked} onPress={() => void toggleHomeLike()} size={21} /><Text>{homeLikeCount === null ? '' : ' ' + homeLikeCount}</Text></View><View style={s.postAction}><I name="chat" size={19} /><Text> {homeCommentCount}</Text></View><View style={s.postAction}><I name="share" size={19} /><Text> {homeShareCount}</Text></View></View></Pressable>}
       <View style={s.mini}><Text style={s.miniTitle}>Delivered without the stress.</Text><Text style={s.miniText}>Pay once. We calculate delivery and keep you updated.</Text><Pressable onPress={() => router.push('/orders')}><Text style={s.miniLink}>Track an order →</Text></Pressable></View>
       <View style={{ marginTop: 18 }}><SectionTitle title="Your spaces" /><View style={{ flexDirection: 'row', gap: 8 }}><Pressable onPress={() => router.push('/live')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.plum }}><Text style={{ fontSize: 10, fontWeight: '900', color: C.sun }}>LIVE NOW</Text><Text style={{ fontSize: 16, fontWeight: '900', color: '#FFF', marginTop: 5 }}>Watch girls live</Text><Text style={{ fontSize: 10, color: '#EADDE4', marginTop: 4 }}>Join the room →</Text></Pressable><Pressable onPress={() => router.push('/seller-onboarding')} style={{ flex: 1, padding: 15, borderRadius: 24, backgroundColor: C.rose }}><Text style={{ fontSize: 10, fontWeight: '900' }}>SELL WITH US</Text><Text style={{ fontSize: 16, fontWeight: '900', marginTop: 5 }}>Open your shop</Text><Text style={{ fontSize: 10, marginTop: 4, fontWeight: '800' }}>Start here →</Text></Pressable></View></View>
     </Animated.ScrollView>
