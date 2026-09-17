@@ -82,14 +82,12 @@ export default function Auction() {
     try {
       const user = await getSessionUser();
       if (!user) throw new Error('Sign in before placing a bid.');
+      if (product.store?.owner_id === user.id) throw new Error('You cannot bid on your own listing.');
        const amount = Number(bidAmount);
        if (!Number.isFinite(amount) || amount <= currentBid) throw new Error(`Your bid must be higher than GH₵ ${currentBid.toFixed(0)}.`);
-      const { data, error } = await supabase.from('bids')
-        .insert({ product_id: product.id, bidder_id: user.id, amount })
-        .select('amount')
-        .single();
+      const { data, error } = await supabase.rpc('place_bid', { p_product_id: product.id, p_amount: amount });
       if (error) throw error;
-       setCurrentBid(Number(data.amount));
+       setCurrentBid(Number((data as any)?.amount || amount));
        setCurrentBidderId(user.id);
       setServiceUnavailable(false);
       setMessage('Bid accepted. The auction result will be determined from the live bids.');
