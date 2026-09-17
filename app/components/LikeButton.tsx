@@ -4,10 +4,10 @@ import { C } from '../constants/theme';
 import { I } from './Icons';
 import { MotionPressable } from './MotionPressable';
 
-export function LikeButton({ liked, onPress, size = 23 }: { liked: boolean; onPress: () => void; size?: number }) {
+export function LikeButton({ liked, onPress, size = 23 }: { liked: boolean; onPress?: () => void; size?: number }) {
   const scale = useRef(new Animated.Value(1)).current;
   const tap = () => {
-    onPress();
+    onPress?.();
     scale.setValue(0.68);
     Animated.sequence([
       Animated.timing(scale, { toValue: 1.3, duration: 150, useNativeDriver: true }),

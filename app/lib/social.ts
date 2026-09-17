@@ -849,7 +849,7 @@ export async function getStore(identifier: string) {
   if (!store) return null;
   const { data: owner, error: ownerError } = await supabase
     .from('profiles')
-      .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links')
+      .select('id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at,country,area,location,date_of_birth,links,video_autoplay')
     .eq('id', store.owner_id)
     .maybeSingle();
   if (ownerError) throw new Error(`Could not load store owner: ${errorMessage(ownerError, 'Supabase rejected the request')}`);
