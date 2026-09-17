@@ -17,7 +17,11 @@ alter table products add column if not exists delivery_options text[] default '{
 alter table products add column if not exists bid_min_price numeric(12,2);
 alter table products add column if not exists bid_ends_at timestamptz;
 create table if not exists services(id uuid primary key default gen_random_uuid(), owner_id uuid references profiles(id) on delete cascade, name text not null, description text default '', category text not null, price numeric(12,2) not null default 0, duration_minutes int default 60, delivery_options text[] default '{}', filters jsonb default '{}', created_at timestamptz default now());
+alter table services add column if not exists image_urls text[] default '{}';
+alter table posts add column if not exists service_id uuid references services(id) on delete cascade;
+alter table posts add column if not exists metadata jsonb default '{}';
 create index if not exists services_owner_idx on services(owner_id);
+create index if not exists posts_service_idx on posts(service_id);
 alter table services enable row level security;
 drop policy if exists services_read on services;
 create policy services_read on services for select using (true);

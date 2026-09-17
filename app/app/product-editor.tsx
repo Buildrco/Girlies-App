@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
-import { createProduct, createStore, getCurrentProfile, getProducts, getStore, updateProduct, type MediaItem } from '../lib/social';
+import { createMarketplaceAnnouncement, createProduct, createStore, getCurrentProfile, getProducts, getStore, updateProduct, type MediaItem } from '../lib/social';
 
 const categories = ['Hair', 'Beauty', 'Fashion', 'Fragrance', 'Bags', 'Jewellery', 'Shoes', 'Home'];
 const fulfillmentOptions = ['Local delivery', 'Pickup', 'Ships nationwide'];
@@ -67,7 +67,7 @@ export default function ProductEditor() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert('Permission needed', 'Allow Girlies to access your photos so you can add product images.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.9 });
-    if (!result.canceled) setMedia(result.assets.slice(0, Math.max(0, 4 - existingImages.length)).map(asset => ({ uri: asset.uri, type: 'image', name: asset.fileName || 'product.jpg', mimeType: asset.mimeType || 'image/jpeg' })));
+    if (!result.canceled) setMedia(current => [...current, ...result.assets.slice(0, Math.max(0, 4 - existingImages.length - current.length)).map(asset => ({ uri: asset.uri, type: 'image', name: asset.fileName || 'product.jpg', mimeType: asset.mimeType || 'image/jpeg' }))]);
   }
 
   const toggle = (value: string, values: string[], setValues: (next: string[]) => void) => setValues(values.includes(value) ? values.filter(item => item !== value) : [...values, value]);
@@ -81,9 +81,17 @@ export default function ProductEditor() {
       setSaving(true);
       const filterMap = Object.fromEntries(filters.map(item => [item, true]));
       const payload = { name, description, category, price: numericPrice, stock: Number(stock) || 0, stockStatus, fulfillment, bidEnabled, bidPrice: bidEnabled ? numericBid : null, bidEndsAt: bidEnabled && bidEndsAt ? bidEndsAt.replace(' ', 'T') : null, gender, filters: filterMap, deliveryOptions, media };
-      if (editingId) await updateProduct(editingId, { ...payload, existingImageUrls: existingImages });
-      else await createProduct({ ...payload, storeId, media });
-      Alert.alert(editingId ? 'Product updated' : 'Product published', `${name} is now live in ${shopName}.`, [{ text: 'Done', onPress: () => router.replace('/seller/me') }]);
+      const product = editingId
+        ? await updateProduct(editingId, { ...payload, existingImageUrls: existingImages })
+        : await createProduct({ ...payload, storeId, media });
+      if (!editingId) {
+        Alert.alert('Product published', `${name} is now live in ${shopName}.`, [
+          { text: 'Announce to community', onPress: () => createMarketplaceAnnouncement({ productId: product.id, body: `${name} is now available at ${shopName}.`, imageUrls: product.image_urls, storeName: shopName }).then(() => router.replace('/seller/me')).catch((error: any) => Alert.alert('Could not announce', error?.message || 'The product was published.')) },
+          { text: 'Done', onPress: () => router.replace('/seller/me') },
+        ]);
+      } else {
+        Alert.alert('Product updated', `${name} is now live in ${shopName}.`, [{ text: 'Done', onPress: () => router.replace('/seller/me') }]);
+      }
     } catch (error: any) { Alert.alert(editingId ? 'Could not update product' : 'Could not publish product', error?.message || 'Please try again.'); } finally { setSaving(false); }
   }
 

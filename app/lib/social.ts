@@ -48,7 +48,7 @@ function getExtension(item: MediaItem, mimeType: string) {
   return item.type === 'video' ? 'mp4' : 'jpg';
 }
 
-export async function uploadMedia(userId: string, item: MediaItem, folder: 'posts' | 'stories' | 'products' | 'avatars') {
+export async function uploadMedia(userId: string, item: MediaItem, folder: 'posts' | 'stories' | 'products' | 'services' | 'avatars') {
   const mimeType = getMimeType(item);
   const extension = getExtension(item, mimeType);
   const uniqueName = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -219,10 +219,12 @@ export async function getCountries(): Promise<CountryOption[]> {
   const response = await fetch('https://countriesnow.space/api/v0.1/countries/positions');
   if (!response.ok) throw new Error('Could not load countries.');
   const payload = await response.json();
-  return (payload.data || [])
+  const countries = (payload.data || [])
     .map((country: any) => ({ name: String(country.name || ''), iso2: String(country.iso2 || '') }))
     .filter((country: CountryOption) => country.name)
     .sort((a: CountryOption, b: CountryOption) => a.name.localeCompare(b.name));
+  if (!countries.some((country: CountryOption) => country.name.toLowerCase() === 'ghana')) countries.push({ name: 'Ghana', iso2: 'GH' });
+  return countries.sort((a: CountryOption, b: CountryOption) => a.name.localeCompare(b.name));
 }
 
 export async function getAreas(country: string): Promise<string[]> {
@@ -487,29 +489,67 @@ export async function updateStore(storeId: string, input: { name: string; descri
   return data;
 }
 
-export async function createService(input: { name: string; description: string; category: string; price: number; durationMinutes: number; deliveryOptions: string[]; filters: Record<string, unknown> }) {
+export type ServiceRecord = {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  price: number;
+  duration_minutes: number;
+  delivery_options: string[];
+  filters: Record<string, unknown>;
+  image_urls: string[];
+  created_at: string;
+};
+
+export async function createService(input: { name: string; description: string; category: string; price: number; durationMinutes: number; deliveryOptions: string[]; filters: Record<string, unknown>; media?: MediaItem[] }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to publish a service.');
-  const { data, error } = await supabase.from('services').insert({
-    owner_id: user.id,
-    name: input.name.trim(),
-    description: input.description.trim(),
-    category: input.category.trim(),
-    price: input.price,
-    duration_minutes: input.durationMinutes,
-    delivery_options: input.deliveryOptions,
-    filters: input.filters,
-  }).select().single();
-  if (error) throw new Error(`Service publish failed: ${errorMessage(error, 'Supabase rejected the service')}`);
-  return data;
+  const uploadedPaths: string[] = [];
+  try {
+    const imageUrls: string[] = [];
+    for (const item of input.media || []) {
+      const uploaded = await uploadMedia(user.id, item, 'services');
+      uploadedPaths.push(uploaded.path);
+      imageUrls.push(uploaded.url);
+    }
+    const { data, error } = await supabase.from('services').insert({
+      owner_id: user.id,
+      name: input.name.trim(),
+      description: input.description.trim(),
+      category: input.category.trim(),
+      price: input.price,
+      duration_minutes: input.durationMinutes,
+      delivery_options: input.deliveryOptions,
+      filters: input.filters,
+      image_urls: imageUrls,
+    }).select().single();
+    if (error) throw new Error(`Service publish failed: ${errorMessage(error, 'Supabase rejected the service')}`);
+    return data as ServiceRecord;
+  } catch (error) {
+    await removeUploadedMedia(uploadedPaths);
+    throw error;
+  }
 }
 
 export async function getServices(ownerId?: string) {
-  let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,created_at').order('created_at', { ascending: false }).limit(80);
+  let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').order('created_at', { ascending: false }).limit(80);
   if (ownerId) query = query.eq('owner_id', ownerId);
   const { data, error } = await query;
   if (error) throw new Error(`Could not load services: ${errorMessage(error, 'Supabase rejected the request')}`);
-  return data || [];
+  return (data || []).map((row: any) => ({
+    ...row,
+    image_urls: Array.isArray(row.image_urls) ? row.image_urls : [],
+    filters: row.filters && typeof row.filters === 'object' ? row.filters : {},
+  })) as ServiceRecord[];
+}
+
+export async function getService(serviceId: string) {
+  const { data, error } = await supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').eq('id', serviceId).maybeSingle();
+  if (error) throw new Error(`Could not load service: ${errorMessage(error, 'Supabase rejected the request')}`);
+  if (!data) return null;
+  return { ...(data as any), image_urls: Array.isArray((data as any).image_urls) ? (data as any).image_urls : [] } as ServiceRecord;
 }
 
 export async function createProduct(input: {
@@ -623,8 +663,9 @@ export async function updateProduct(productId: string, input: {
 export async function deleteProduct(productId: string) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to delete a product.');
-  const { error } = await supabase.from('products').delete().eq('id', productId);
+  const { data, error } = await supabase.from('products').delete().eq('id', productId).select('id').maybeSingle();
   if (error) throw new Error(`Product delete failed: ${errorMessage(error, 'Supabase rejected the deletion')}`);
+  if (!data) throw new Error('Product not found or you do not own it.');
 }
 
 export async function deleteService(serviceId: string) {
@@ -632,6 +673,36 @@ export async function deleteService(serviceId: string) {
   if (!user) throw new Error('Please sign in to delete a service.');
   const { error } = await supabase.from('services').delete().eq('id', serviceId).eq('owner_id', user.id);
   if (error) throw new Error(`Service delete failed: ${errorMessage(error, 'Supabase rejected the deletion')}`);
+}
+
+export async function createMarketplaceAnnouncement(input: {
+  productId?: string;
+  serviceId?: string;
+  body: string;
+  imageUrls?: string[];
+  storeName: string;
+  storeSlug?: string;
+}) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to announce your listing.');
+  if (!input.productId && !input.serviceId) throw new Error('Choose a product or service to announce.');
+  const { data, error } = await supabase.from('posts').insert({
+    author_id: user.id,
+    body: input.body.trim(),
+    media_urls: (input.imageUrls || []).slice(0, 4),
+    visibility: 'public',
+    product_id: input.productId || null,
+    service_id: input.serviceId || null,
+    metadata: {
+      kind: 'marketplace_announcement',
+      store_name: input.storeName,
+      store_slug: input.storeSlug || null,
+      product_id: input.productId || null,
+      service_id: input.serviceId || null,
+    },
+  }).select().single();
+  if (error) throw new Error(`Announcement failed: ${errorMessage(error, 'Supabase rejected the announcement')}`);
+  return data;
 }
 
 export async function getProducts(
