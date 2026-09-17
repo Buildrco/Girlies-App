@@ -366,6 +366,32 @@ export async function setPostLike(postId: string, shouldLike: boolean) {
   return verified;
 }
 
+export async function reportPost(postId: string, reason = 'reported_from_viewer') {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to report a post.');
+  const { error } = await supabase.from('post_reports').upsert(
+    { post_id: postId, reporter_id: me.id, reason },
+    { onConflict: 'post_id,reporter_id' },
+  );
+  if (error) throw new Error(`Report failed: ${errorMessage(error, 'Supabase rejected the report')}`);
+}
+
+export async function setPostPreference(postId: string, preference: 'not_interested', enabled: boolean) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to update your preferences.');
+  if (enabled) {
+    const { error } = await supabase.from('post_preferences').upsert(
+      { post_id: postId, user_id: me.id, preference },
+      { onConflict: 'post_id,user_id,preference' },
+    );
+    if (error) throw new Error(`Preference failed: ${errorMessage(error, 'Supabase rejected the preference')}`);
+  } else {
+    const { error } = await supabase.from('post_preferences')
+      .delete().eq('post_id', postId).eq('user_id', me.id).eq('preference', preference);
+    if (error) throw new Error(`Preference failed: ${errorMessage(error, 'Supabase rejected the preference')}`);
+  }
+}
+
 export async function getPostLikeState(postId: string) {
   const me = await getSessionUser();
   if (!me) return false;
