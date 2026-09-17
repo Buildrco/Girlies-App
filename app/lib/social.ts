@@ -291,6 +291,7 @@ export async function createPost(body: string, media: MediaItem[]) {
       body: trimmedBody,
       media_urls,
       visibility: 'public',
+      metadata: { media_types: media.map(item => item.type) },
     }).select().single();
     if (error) throw new Error(`Post creation failed: ${errorMessage(error, 'Supabase rejected the post')}`);
     if (!data) throw new Error('Post creation succeeded but returned no post.');
