@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -28,6 +28,16 @@ export default function EditProfile() {
   const [picker, setPicker] = useState<'country' | 'area' | 'town' | null>(null);
   const [query, setQuery] = useState('');
   const [areasLoading, setAreasLoading] = useState(false);
+  const sheetY = useRef(new Animated.Value(0)).current;
+  const sheetResponder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderMove: (_, gesture) => { if (gesture.dy > 0) sheetY.setValue(gesture.dy); },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy > 120 || gesture.vy > 1.2) {
+        Animated.timing(sheetY, { toValue: 520, duration: 180, useNativeDriver: true }).start(() => setPicker(null));
+      } else Animated.spring(sheetY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 260 }).start();
+    },
+  })).current;
 
   useEffect(() => {
     let active = true;
@@ -93,8 +103,15 @@ export default function EditProfile() {
     if (picker === 'country') { setCountry(value); setArea(''); setTown(''); }
     if (picker === 'area') { setArea(value); setTown(''); }
     if (picker === 'town') setTown(value);
-    setPicker(null);
+    Animated.timing(sheetY, { toValue: 520, duration: 160, useNativeDriver: true }).start(() => {
+      sheetY.setValue(0);
+      setPicker(null);
+    });
   };
+  const closePicker = () => Animated.timing(sheetY, { toValue: 520, duration: 160, useNativeDriver: true }).start(() => {
+    sheetY.setValue(0);
+    setPicker(null);
+  });
 
   if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -112,8 +129,8 @@ export default function EditProfile() {
       <Text style={s.note}>Your links appear on your public profile. Your date of birth stays private.</Text>
     </ScrollView>
   </KeyboardAvoidingView>
-  <Modal visible={Boolean(picker)} transparent animationType="slide" onRequestClose={() => setPicker(null)}>
-    <Pressable style={s.modalBackdrop} onPress={() => setPicker(null)}><Pressable style={s.sheet} onPress={event => event.stopPropagation()}><View style={s.sheetHandle} /><View style={s.sheetTop}><Text style={s.sheetTitle}>{title}</Text><Pressable onPress={() => setPicker(null)}><I name="back" size={24} /></Pressable></View><TextInput autoFocus value={query} onChangeText={setQuery} placeholder="Search" placeholderTextColor={C.muted} style={s.searchInput} />{picker === 'area' && areasLoading ? <ActivityIndicator color={C.pink} style={{ margin: 24 }} /> : <ScrollView keyboardShouldPersistTaps="handled" style={s.options}>{items.filter(item => item.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 100).map(item => <MotionPressable key={item} onPress={() => select(item)} style={s.option}><Text style={s.optionText}>{item}</Text></MotionPressable>)}</ScrollView>}</Pressable></Pressable>
+  <Modal visible={Boolean(picker)} transparent animationType="none" onRequestClose={closePicker}>
+    <Pressable style={s.modalBackdrop} onPress={closePicker}><Animated.View {...sheetResponder.panHandlers} style={[s.sheet, { transform: [{ translateY: sheetY }] }]} onStartShouldSetResponder={() => true} onTouchEnd={event => event.stopPropagation()}><View style={s.sheetHandle} /><View style={s.sheetTop}><Text style={s.sheetTitle}>{title}</Text><Pressable onPress={closePicker}><I name="back" size={24} /></Pressable></View><TextInput autoFocus value={query} onChangeText={setQuery} placeholder={picker === 'area' ? 'Type an area, e.g. Awoshie' : 'Search'} placeholderTextColor={C.muted} style={s.searchInput} />{picker === 'area' && areasLoading ? <ActivityIndicator color={C.pink} style={{ margin: 24 }} /> : <ScrollView keyboardShouldPersistTaps="handled" style={s.options}>{items.filter(item => item.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 100).map(item => <MotionPressable key={item} onPress={() => select(item)} style={s.option}><Text style={s.optionText}>{item}</Text></MotionPressable>)}</ScrollView>}</Animated.View></Pressable>
   </Modal>
   </SafeAreaView>;
 }

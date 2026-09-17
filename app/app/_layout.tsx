@@ -3,7 +3,6 @@ import { Stack, usePathname } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
-import { TouchFeedbackRoot } from '../components/MotionPressable';
 
 function NavigationChrome() {
   const pathname = usePathname();
@@ -15,8 +14,7 @@ function NavigationChrome() {
 export default function Layout() {
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <StatusBar style="dark" />
-    <TouchFeedbackRoot>
-      <ChromeVisibilityProvider>
+    <ChromeVisibilityProvider>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -29,7 +27,6 @@ export default function Layout() {
           <Stack.Screen name="profile" options={{ animation: 'none' }} />
         </Stack>
         <NavigationChrome />
-      </ChromeVisibilityProvider>
-    </TouchFeedbackRoot>
+    </ChromeVisibilityProvider>
   </GestureHandlerRootView>;
 }

@@ -114,6 +114,14 @@ export type ProfileRecord = {
 
 export type CountryOption = { name: string; iso2: string };
 
+export const GHANA_CITIES = ['Accra', 'Kumasi', 'Tema', 'Takoradi', 'Cape Coast', 'Koforidua', 'Tamale', 'Sunyani', 'Ho', 'Wa', 'Bolgatanga'];
+export const GHANA_AREAS = [
+  'Ablekuma', 'Adabraka', 'Airport Residential', 'Awoshie', 'Cantonments', 'Dansoman',
+  'East Legon', 'Kaneshie', 'Kasoa', 'Labadi', 'Labone', 'Lapaz', 'Madina', 'Nungua',
+  'Osu', 'Spintex', 'Teshie', 'Dzorwulu', 'Achimota', 'Kwadaso', 'Bantama', 'Asokwa',
+  'Ahodwo', 'Adum', 'Suame', 'Ejisu', 'Tanoso', 'Kokomlemle', 'Ridge', 'Tesano',
+];
+
 const PROFILE_BASE_SELECT = 'id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at';
 const PROFILE_SELECT = `${PROFILE_BASE_SELECT},country,area,location,date_of_birth,links`;
 
@@ -218,6 +226,7 @@ export async function getCountries(): Promise<CountryOption[]> {
 }
 
 export async function getAreas(country: string): Promise<string[]> {
+  if (country.trim().toLowerCase() === 'ghana') return GHANA_AREAS;
   const response = await fetch('https://countriesnow.space/api/v0.1/countries/states', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -232,6 +241,7 @@ export async function getAreas(country: string): Promise<string[]> {
 }
 
 export async function getCities(country: string, state: string): Promise<string[]> {
+  if (country.trim().toLowerCase() === 'ghana') return GHANA_CITIES;
   const response = await fetch('https://countriesnow.space/api/v0.1/countries/state/cities', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
