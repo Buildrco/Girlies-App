@@ -72,9 +72,9 @@ export default function Home() {
       setSessionUserId(me?.id || null);
       const [currentResult, profilesResult, productsResult, postResult] = await Promise.all([
         getCurrentProfile().catch(() => null),
-        supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count,country,area,location').order('created_at', { ascending: true }).limit(5).then(result => result.data || []).catch(() => []),
+        supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count,country,area,location').order('created_at', { ascending: true }).limit(5).then(result => result.data || [], () => []),
         getProducts(5).catch(() => []),
-        supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null).catch(() => null),
+        supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null, () => null),
       ]);
       if (!active) return;
       const liveSellers = profilesResult as SellerProfile[];
@@ -83,12 +83,12 @@ export default function Home() {
       if (!post) return;
       const postId = post.id;
       const [profile, followedRows, postLiked, likeCount, commentCount, shareCount] = await Promise.all([
-        supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle().then(result => result.data || undefined).catch(() => undefined),
-        me ? supabase.from('follows').select('following_id').eq('follower_id', me.id).then(result => result.data || []).catch(() => []) : Promise.resolve([]),
+        supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle().then(result => result.data || undefined, () => undefined),
+        me ? supabase.from('follows').select('following_id').eq('follower_id', me.id).then(result => result.data || [], () => []) : Promise.resolve([]),
         getPostLikeState(postId).catch(() => false),
-        supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
-        supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
-        supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
+        supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0, () => 0),
+        supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0, () => 0),
+        supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0, () => 0),
       ]);
       if (!active) return;
       setHomePost({ ...post, media_urls: post.media_urls || [], profile }); setHomePostId(postId); setLiked(postLiked);
