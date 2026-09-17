@@ -63,61 +63,37 @@ export default function Home() {
   const [likeBusy, setLikeBusy] = useState(false);
   useFocusEffect(useCallback(() => {
     let active = true;
+    setSellerIds([]); setSellerProfiles([]); setProducts([]); setHomePostId(null); setHomePost(null);
+    setFollowed(new Set()); setLiked(false); setHomeLikeCount(null); setHomeCommentCount(0); setHomeShareCount(0);
     async function loadLiveState() {
-      try {
-        const me = await getSessionUser();
-        if (!active) return;
-        setSessionUserId(me?.id || null);
-        const [current, profilesResult, productsResult, postResult] = await Promise.all([
-          getCurrentProfile().catch(() => null),
-          supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count,country,area,location').order('created_at', { ascending: true }).limit(5),
-          getProducts(5),
-          supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1),
-        ]);
-        if (profilesResult.error) throw profilesResult.error;
-        if (postResult.error) throw postResult.error;
-        const liveSellers = (profilesResult.data || []) as SellerProfile[];
-        setCurrentProfile(current);
-        const liveSellerIds = liveSellers.map(row => row.id);
-        setSellerProfiles(liveSellers);
-        setSellerIds(liveSellerIds);
-        setProducts(productsResult);
-        const post = postResult.data?.[0] || null;
-        const postId = post?.id || null;
-        setHomePostId(postId);
-        if (!post) {
-          setHomePost(null);
-          setFollowed(new Set());
-          setLiked(false);
-          setHomeLikeCount(null);
-          setHomeCommentCount(0);
-          setHomeShareCount(0);
-          return;
-        }
-        const [profileResult, followResult, likeResult, countResult, commentsResult, sharesResult] = await Promise.all([
-          supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle(),
-          me ? supabase.from('follows').select('following_id').eq('follower_id', me.id) : Promise.resolve({ data: [], error: null }),
-          getPostLikeState(postId),
-          supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId),
-          supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId),
-          supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId),
-        ]);
-        if (profileResult.error) throw profileResult.error;
-        if (followResult.error) throw followResult.error;
-        if (countResult.error) throw countResult.error;
-        if (commentsResult.error) throw commentsResult.error;
-        if (sharesResult.error) throw sharesResult.error;
-        if (!active) return;
-        setHomePost({ ...post, media_urls: post.media_urls || [], profile: profileResult.data || undefined });
-        const followedIds = new Set((followResult.data || []).map(row => row.following_id));
-        setFollowed(new Set(liveSellerIds.map((id, index) => followedIds.has(id) ? index : -1).filter(index => index >= 0)));
-        setLiked(likeResult);
-        setHomeLikeCount(countResult.count || 0);
-        setHomeCommentCount(commentsResult.count || 0);
-        setHomeShareCount(sharesResult.count || 0);
-      } catch (error) {
-        if (active) Alert.alert('Could not load live activity', error instanceof Error ? error.message : 'Please try again.');
-      }
+      const me = await getSessionUser().catch(() => null);
+      if (!active) return;
+      setSessionUserId(me?.id || null);
+      const [currentResult, profilesResult, productsResult, postResult] = await Promise.all([
+        getCurrentProfile().catch(() => null),
+        supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,followers_count,country,area,location').order('created_at', { ascending: true }).limit(5).then(result => result.data || []).catch(() => []),
+        getProducts(5).catch(() => []),
+        supabase.from('posts').select('id,author_id,body,media_urls,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null).catch(() => null),
+      ]);
+      if (!active) return;
+      const liveSellers = profilesResult as SellerProfile[];
+      setCurrentProfile(currentResult); setSellerProfiles(liveSellers); setSellerIds(liveSellers.map(row => row.id)); setProducts(productsResult);
+      const post = postResult as HomePost | null;
+      if (!post) return;
+      const postId = post.id;
+      const [profile, followedRows, postLiked, likeCount, commentCount, shareCount] = await Promise.all([
+        supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle().then(result => result.data || undefined).catch(() => undefined),
+        me ? supabase.from('follows').select('following_id').eq('follower_id', me.id).then(result => result.data || []).catch(() => []) : Promise.resolve([]),
+        getPostLikeState(postId).catch(() => false),
+        supabase.from('post_likes').select('post_id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
+        supabase.from('post_comments').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
+        supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0).catch(() => 0),
+      ]);
+      if (!active) return;
+      setHomePost({ ...post, media_urls: post.media_urls || [], profile }); setHomePostId(postId); setLiked(postLiked);
+      const followedIds = new Set((followedRows as { following_id: string }[]).map(row => row.following_id));
+      setFollowed(new Set(liveSellers.map((row, index) => followedIds.has(row.id) ? index : -1).filter(index => index >= 0)));
+      setHomeLikeCount(likeCount); setHomeCommentCount(commentCount); setHomeShareCount(shareCount);
     }
     void loadLiveState();
     return () => { active = false; };
