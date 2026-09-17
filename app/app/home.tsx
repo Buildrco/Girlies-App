@@ -32,7 +32,7 @@ function getMediaType(post: HomePost, url: string, index: number): 'image' | 'vi
   return VIDEO_URL_PATTERN.test(url) ? 'video' : 'image';
 }
 function HomeVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
-  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = false; if (autoplay) currentPlayer.play(); });
+  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = true; if (autoplay) currentPlayer.play(); });
   useEffect(() => { if (autoplay) player.play(); else player.pause(); }, [autoplay, player]);
   return <VideoView player={player} style={s.postImg} nativeControls={false} contentFit="cover" />;
 }
