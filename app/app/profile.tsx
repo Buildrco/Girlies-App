@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, SafeAreaView, ScrollView, View, Text, Pressable, Image, StyleSheet, TextInput } from 'react-native';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { Avatar, VerifiedMark } from '../Avatar';
@@ -19,9 +18,8 @@ function getMediaType(post: Post, url: string, index: number): 'image' | 'video'
   if (typed === 'video' || typed === 'image') return typed;
   return VIDEO_URL_PATTERN.test(url) ? 'video' : 'image';
 }
-function ProfileVideo({ url }: { url: string }) {
-  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = false; });
-  return <VideoView player={player} style={s.postImage} nativeControls contentFit="cover" />;
+function ProfileVideo({ url: _url }: { url: string }) {
+  return <View style={[s.postImage, { backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#FFF', fontWeight: '900' }}>Video preview</Text></View>;
 }
 
 export default function Profile() {
