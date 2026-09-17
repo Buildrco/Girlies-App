@@ -28,12 +28,13 @@ export default function Create() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: video ? ['videos'] : ['images'],
-      allowsMultipleSelection: !video,
+      allowsMultipleSelection: false,
+      allowsEditing: !video,
       quality: 0.9,
       videoMaxDuration: 120,
     });
     if (result.canceled) return;
-    const selected: MediaItem[] = result.assets.map((a: ImagePicker.ImagePickerAsset) => ({
+    const selected: MediaItem[] = result.assets.slice(0, 1).map((a: ImagePicker.ImagePickerAsset) => ({
       uri: a.uri,
       type: (a.type === 'video' ? 'video' : 'image') as 'image' | 'video',
       name: a.fileName || undefined,
