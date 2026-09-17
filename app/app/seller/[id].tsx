@@ -241,7 +241,7 @@ export default function Seller() {
           <Pressable onPress={() => router.push('/chat')}><I name="chat" size={23} /></Pressable>
         </View>
         <View style={s.cover}>
-          {products[0]?.image_urls?.[0] ? <Image source={{ uri: products[0].image_urls[0] }} style={s.coverImg} /> : <View style={s.coverEmpty} />}
+          {store.banner_urls?.[0] || products[0]?.image_urls?.[0] ? <Image source={{ uri: store.banner_urls?.[0] || products[0].image_urls[0] }} style={s.coverImg} /> : <View style={s.coverEmpty} />}
         </View>
         <View style={s.profile}>
           <Avatar size={82} uri={owner?.avatar_url} />
