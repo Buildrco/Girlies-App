@@ -418,6 +418,14 @@ export async function setBookmark(postId: string, shouldBookmark: boolean) {
   return verified;
 }
 
+export async function deletePost(postId: string) {
+  const me = await getSessionUser();
+  if (!me) throw new Error('Please sign in to delete a post.');
+  const { data, error } = await supabase.from('posts').delete().eq('id', postId).eq('author_id', me.id).select('id').maybeSingle();
+  if (error) throw new Error(`Post delete failed: ${errorMessage(error, 'Supabase rejected the deletion')}`);
+  if (!data) throw new Error('Post not found or you do not own it.');
+}
+
 export async function addComment(postId: string, body: string) {
   const me = await getSessionUser();
   if (!me) throw new Error('Please sign in to comment.');
@@ -548,6 +556,27 @@ export async function createService(input: { name: string; description: string; 
   }
 }
 
+
+export async function updateService(serviceId: string, input: { name: string; description: string; category: string; price: number; durationMinutes: number; deliveryOptions: string[]; filters: Record<string, unknown>; media?: MediaItem[]; existingImageUrls?: string[] }) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to edit a service.');
+  const uploadedPaths: string[] = [];
+  try {
+    const imageUrls = [...(input.existingImageUrls || [])];
+    for (const item of input.media || []) {
+      const uploaded = await uploadMedia(user.id, item, 'services');
+      uploadedPaths.push(uploaded.path); imageUrls.push(uploaded.url);
+    }
+    const { data, error } = await supabase.from('services').update({
+      name: input.name.trim(), description: input.description.trim(), category: input.category.trim(),
+      price: input.price, duration_minutes: input.durationMinutes, delivery_options: input.deliveryOptions,
+      filters: input.filters, image_urls: imageUrls.slice(0, 4),
+    }).eq('id', serviceId).eq('owner_id', user.id).select().single();
+    if (error) throw new Error(`Service update failed: ${errorMessage(error, 'Supabase rejected the service')}`);
+    return data as ServiceRecord;
+  } catch (error) { await removeUploadedMedia(uploadedPaths); throw error; }
+}
+
 export async function getServices(ownerId?: string) {
   let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').order('created_at', { ascending: false }).limit(80);
   if (ownerId) query = query.eq('owner_id', ownerId);
@@ -564,7 +593,7 @@ export async function getService(serviceId: string) {
   const { data, error } = await supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').eq('id', serviceId).maybeSingle();
   if (error) throw new Error(`Could not load service: ${errorMessage(error, 'Supabase rejected the request')}`);
   if (!data) return null;
-  return { ...(data as any), image_urls: Array.isArray((data as any).image_urls) ? (data as any).image_urls : [] } as ServiceRecord;
+  return { ...(data as any), image_urls: normalizeImageUrls((data as any).image_urls) } as ServiceRecord;
 }
 
 export async function createProduct(input: {
