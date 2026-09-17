@@ -24,7 +24,7 @@ function getMediaType(post: any, url: string, index: number): 'image' | 'video' 
 function SellerVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
   const player = useVideoPlayer(url, currentPlayer => {
     currentPlayer.loop = true;
-    currentPlayer.muted = false;
+    currentPlayer.muted = true;
     if (autoplay) currentPlayer.play();
   });
   useEffect(() => {
@@ -37,7 +37,7 @@ function SellerVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
 function FullscreenVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
   const player = useVideoPlayer(url, currentPlayer => {
     currentPlayer.loop = false;
-    currentPlayer.muted = false;
+    currentPlayer.muted = true;
     if (autoplay) currentPlayer.play();
   });
   useEffect(() => {
