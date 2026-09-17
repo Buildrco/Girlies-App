@@ -1,5 +1,5 @@
 create extension if not exists pgcrypto;
-create table if not exists profiles(id uuid primary key references auth.users(id) on delete cascade, display_name text not null, handle text unique not null, bio text default '', avatar_url text, verified boolean default false, followers_count int default 0, following_count int default 0, country text, area text, location text, date_of_birth date, links text[] default '{}', created_at timestamptz default now());
+create table if not exists profiles(id uuid primary key references auth.users(id) on delete cascade, display_name text not null, handle text unique not null, bio text default '', avatar_url text, verified boolean default false, followers_count int default 0, following_count int default 0, country text, area text, location text, date_of_birth date, links text[] default '{}', video_autoplay boolean not null default true, created_at timestamptz default now());
 create table if not exists stores(id uuid primary key default gen_random_uuid(), owner_id uuid references profiles(id) on delete cascade, name text not null, slug text unique not null, description text default '', lat double precision, lng double precision, rating numeric(3,2) default 0, verification_status text default 'pending', created_at timestamptz default now());
 create table if not exists products(id uuid primary key default gen_random_uuid(), store_id uuid references stores(id) on delete cascade, name text not null, description text default '', category text not null, price numeric(12,2) not null, currency text default 'GHS', stock int default 0, fulfillment text default 'local', estimated_arrival text, image_urls text[] default '{}', attributes jsonb default '{}', created_at timestamptz default now());
 create table if not exists posts(id uuid primary key default gen_random_uuid(), author_id uuid references profiles(id) on delete cascade, body text not null, media_urls text[] default '{}', product_id uuid references products(id), visibility text default 'public', repost_of uuid references posts(id), created_at timestamptz default now());
@@ -44,6 +44,7 @@ alter table profiles add column if not exists area text;
 alter table profiles add column if not exists location text;
 alter table profiles add column if not exists date_of_birth date;
 alter table profiles add column if not exists links text[] default '{}';
+alter table profiles add column if not exists video_autoplay boolean not null default true;
 create index if not exists stories_expiry_idx on stories(expires_at);
 create index if not exists post_likes_user_idx on post_likes(user_id);
 create index if not exists post_comments_post_idx on post_comments(post_id,created_at);
