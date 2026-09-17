@@ -47,7 +47,7 @@ export default function ProductEditor() {
           setStoreId(created.id); setShopName(created.name);
         }
         if (editingId) {
-          const product = (await getProducts(1, { productId: editingId }))[0];
+          const product = (await getProducts(1, { productId: editingId, includeOutOfStock: true }))[0];
           if (!product) throw new Error('This product is no longer available.');
           setName(product.name); setDescription(product.description || ''); setCategory(product.category); setPrice(String(product.price)); setStock(String(product.stock || 0));
           setStockStatus(product.stock_status || (product.stock > 0 ? 'in_stock' : 'out_of_stock')); setFulfillment(product.fulfillment || fulfillmentOptions[0]);
