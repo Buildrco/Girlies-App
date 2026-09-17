@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -45,6 +45,7 @@ const imgs = [
 
 export default function Home() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { onScroll } = useChromeVisibility();
   const [hero, setHero] = useState(0);
   const [followed, setFollowed] = useState<Set<number>>(new Set());
@@ -136,7 +137,7 @@ export default function Home() {
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} uri={currentProfile?.avatar_url} verified={currentProfile?.verified} /></Pressable></View></View>
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
-      <View><CurvedBanner image={imgs[hero]} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][hero]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][hero]} color={[C.rose, C.sun, C.lilac][hero]} onPress={() => router.push('/shop')} /><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
+      <View><ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={event => setHero(Math.round(event.nativeEvent.contentOffset.x / width))}>{imgs.slice(0, 3).map((image, index) => <View key={image} style={{ width }}><CurvedBanner image={image} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][index]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][index]} color={[C.rose, C.sun, C.lilac][index]} onPress={() => router.push('/shop')} /></View>)}</ScrollView><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
       <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>
        <SectionTitle title="Popular sellers" onPress={() => router.push('/shop')} />
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>{sellerProfiles.map((seller, index) => { const isMe = seller.id === sessionUserId; const place = [seller.area && seller.location ? `${seller.area} - ${seller.location}` : seller.area || seller.location, seller.country].filter(Boolean).join(', '); return <Pressable key={seller.id} onPress={() => router.push('/seller/' + seller.id)} style={s.seller}><Avatar size={54} index={index} uri={seller.avatar_url} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{seller.display_name}</Text>{seller.verified && <VerifiedMark size={17} />}</View><Text style={s.sellerHandle}>@{seller.handle}</Text><Text style={s.sellerMeta}>{place || 'Location not added'}</Text><Text style={s.sellerMeta}>{(seller.followers_count || 0).toLocaleString()} followers</Text>{!isMe && <Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable>}</Pressable>; })}</ScrollView>
