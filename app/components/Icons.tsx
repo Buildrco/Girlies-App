@@ -8,6 +8,7 @@ const icons: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled?: 
   plus: { outline: 'add' },
   send: { outline: 'paper-plane-outline', filled: 'paper-plane' },
   bag: { outline: 'bag-outline', filled: 'bag' },
+  cart: { outline: 'cart-outline', filled: 'cart' },
   heart: { outline: 'heart-outline', filled: 'heart' },
   more: { outline: 'ellipsis-horizontal' },
   bookmark: { outline: 'bookmark-outline', filled: 'bookmark' },
