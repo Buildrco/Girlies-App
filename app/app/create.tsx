@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable, TextInput, StyleSheet, Image, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { createPost, type MediaItem } from '../lib/social';
+
+function VideoPreview({ url }: { url: string }) {
+  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = true; });
+  useEffect(() => { player.pause(); }, [player]);
+  return <VideoView player={player} style={s.media} nativeControls contentFit="cover" />;
+}
 
 export default function Create() {
   const router = useRouter();
@@ -67,7 +74,7 @@ export default function Create() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.mediaRow}>
             {media.map((m, i) => <View key={`${m.uri}-${i}`} style={s.mediaWrap}>
               {m.type === 'image' ? <Image source={{uri:m.uri}} style={s.media} /> :
-                <View style={[s.media, s.video]}><I name="camera" size={28} color="#FFF" /><Text style={s.videoText}>VIDEO</Text></View>}
+                <VideoPreview url={m.uri} />}
               <Pressable onPress={() => setMedia(x => x.filter((_, n) => n !== i))} style={s.remove}><Text style={s.removeText}>×</Text></Pressable>
             </View>)}
           </ScrollView>
