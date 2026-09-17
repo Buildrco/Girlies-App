@@ -620,6 +620,20 @@ export async function updateProduct(productId: string, input: {
   }
 }
 
+export async function deleteProduct(productId: string) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to delete a product.');
+  const { error } = await supabase.from('products').delete().eq('id', productId);
+  if (error) throw new Error(`Product delete failed: ${errorMessage(error, 'Supabase rejected the deletion')}`);
+}
+
+export async function deleteService(serviceId: string) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to delete a service.');
+  const { error } = await supabase.from('services').delete().eq('id', serviceId).eq('owner_id', user.id);
+  if (error) throw new Error(`Service delete failed: ${errorMessage(error, 'Supabase rejected the deletion')}`);
+}
+
 export async function getProducts(
   limit = 50,
   options: { storeId?: string; category?: string; search?: string; productId?: string } = {},
