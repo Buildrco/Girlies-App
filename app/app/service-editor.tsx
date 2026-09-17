@@ -29,8 +29,8 @@ export default function ServiceEditor() {
   async function pickImages() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert('Permission needed', 'Allow Girlies to access your photos so you can add service images.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.9 });
-    if (!result.canceled) setMedia(current => [...current, ...result.assets.slice(0, Math.max(0, 4 - existingImages.length - current.length)).map(asset => ({ uri: asset.uri, type: 'image' as const, name: asset.fileName || 'service.jpg', mimeType: asset.mimeType || 'image/jpeg' }))].slice(0, 4));
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: false, allowsEditing: true, quality: 0.9 });
+    if (!result.canceled) setMedia(current => [...current, ...result.assets.slice(0, 1).map(asset => ({ uri: asset.uri, type: 'image' as const, name: asset.fileName || 'service.jpg', mimeType: asset.mimeType || 'image/jpeg' }))].slice(0, 4));
   }
   function confirmDelete() { if (!editingId) return; Alert.alert('Delete service?', `“${name || 'This service'}” will be permanently removed.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { setSaving(true); await deleteService(editingId); router.replace('/seller/me'); } catch (error: any) { Alert.alert('Could not delete service', error?.message || 'Please try again.'); } finally { setSaving(false); } } }]); }
   async function save() {
