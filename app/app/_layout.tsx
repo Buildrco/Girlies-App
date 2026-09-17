@@ -3,6 +3,7 @@ import { Stack, usePathname } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
+import { CartProvider } from '../lib/cart';
 
 function NavigationChrome() {
   const pathname = usePathname();
@@ -15,6 +16,7 @@ export default function Layout() {
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <StatusBar style="dark" />
     <ChromeVisibilityProvider>
+      <CartProvider>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -27,6 +29,7 @@ export default function Layout() {
           <Stack.Screen name="profile" options={{ animation: 'none' }} />
         </Stack>
         <NavigationChrome />
+      </CartProvider>
     </ChromeVisibilityProvider>
   </GestureHandlerRootView>;
 }
