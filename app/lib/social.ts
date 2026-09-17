@@ -125,6 +125,7 @@ export type ProfileRecord = {
   location?: string | null;
   date_of_birth?: string | null;
   links?: string[] | null;
+  video_autoplay?: boolean;
 };
 
 export type CountryOption = { name: string; iso2: string };
@@ -138,7 +139,7 @@ export const GHANA_AREAS = [
 ];
 
 const PROFILE_BASE_SELECT = 'id,display_name,handle,bio,avatar_url,verified,followers_count,following_count,created_at';
-const PROFILE_SELECT = `${PROFILE_BASE_SELECT},country,area,location,date_of_birth,links`;
+const PROFILE_SELECT = `${PROFILE_BASE_SELECT},country,area,location,date_of_birth,links,video_autoplay`;
 
 function isMissingProfileColumn(error: unknown) {
   const message = errorMessage(error, '').toLowerCase();
@@ -173,6 +174,7 @@ async function selectProfile(userId: string): Promise<ProfileRecord | null> {
     location: null,
     date_of_birth: null,
     links: [],
+    video_autoplay: true,
   } : null;
 }
 
@@ -195,6 +197,7 @@ export async function updateCurrentProfile(input: {
   location: string;
   date_of_birth: string | null;
   links: string[];
+  video_autoplay?: boolean;
   avatar_url?: string | null;
 }) {
   const user = await getSessionUser();
@@ -212,6 +215,7 @@ export async function updateCurrentProfile(input: {
     location: input.location.trim() || null,
     date_of_birth: input.date_of_birth || null,
     links: input.links.filter(Boolean),
+    video_autoplay: input.video_autoplay ?? true,
     ...(input.avatar_url !== undefined ? { avatar_url: input.avatar_url } : {}),
   }).eq('id', user.id).select().single();
 
@@ -751,7 +755,7 @@ export async function createMarketplaceAnnouncement(input: {
 
 export async function getProducts(
   limit = 50,
-  options: { storeId?: string; category?: string; search?: string; productId?: string } = {},
+  options: { storeId?: string; category?: string; search?: string; productId?: string; includeOutOfStock?: boolean } = {},
 ): Promise<ProductRecord[]> {
   let query = supabase
     .from('products')
@@ -760,6 +764,7 @@ export async function getProducts(
     .limit(Math.max(1, limit));
   if (options.storeId) query = query.eq('store_id', options.storeId);
   if (options.productId) query = query.eq('id', options.productId);
+  if (!options.includeOutOfStock && !options.productId) query = query.neq('stock_status', 'out_of_stock');
   if (options.category) query = query.ilike('category', options.category);
   if (options.search?.trim()) query = query.ilike('name', `%${options.search.trim()}%`);
   const { data, error } = await query;
