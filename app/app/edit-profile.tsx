@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,37 +25,15 @@ export default function EditProfile() {
   const [areas, setAreas] = useState<string[]>([]);
   const [towns, setTowns] = useState<string[]>([]);
   const [picker, setPicker] = useState<'country' | 'area' | 'town' | null>(null);
-  const [query, setQuery] = useState('');
   const [areasLoading, setAreasLoading] = useState(false);
-  const sheetY = useRef(new Animated.Value(0)).current;
-  const sheetResponder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onPanResponderMove: (_, gesture) => sheetY.setValue(Math.min(520, Math.max(-120, gesture.dy))),
-    onPanResponderRelease: (_, gesture) => {
-      if (gesture.dy > 140 || gesture.vy > 1.2) {
-        Animated.timing(sheetY, { toValue: 520, duration: 180, useNativeDriver: true }).start(() => setPicker(null));
-      } else if (gesture.dy < -70) {
-        Animated.spring(sheetY, { toValue: -90, useNativeDriver: true, damping: 20, stiffness: 260 }).start();
-      } else {
-        Animated.spring(sheetY, { toValue: 0, useNativeDriver: true, damping: 22, stiffness: 260 }).start();
-      }
-    },
-  })).current;
 
   useEffect(() => {
     let active = true;
     getCurrentProfile().then(profile => {
       if (!active || !profile) return;
-      setAvatar(profile.avatar_url || '');
-      setDisplayName(profile.display_name || '');
-      setHandle(profile.handle || '');
-      setBio(profile.bio || '');
-      setCountry(profile.country || '');
-      setArea(profile.area || '');
-      setTown(profile.location || '');
-      setDateOfBirth(profile.date_of_birth || '');
-      setLinks((profile.links || []).join('\n'));
-      setVideoAutoplay(profile.video_autoplay !== false);
+      setAvatar(profile.avatar_url || ''); setDisplayName(profile.display_name || ''); setHandle(profile.handle || '');
+      setBio(profile.bio || ''); setCountry(profile.country || ''); setArea(profile.area || ''); setTown(profile.location || '');
+      setDateOfBirth(profile.date_of_birth || ''); setLinks((profile.links || []).join('\n'));
     }).catch(error => active && Alert.alert('Could not load profile', error?.message || 'Please try again.')).finally(() => active && setLoading(false));
     getCountries().then(setCountries).catch(() => setCountries([{ name: 'Ghana', iso2: 'GH' }]));
     return () => { active = false; };
@@ -63,16 +41,14 @@ export default function EditProfile() {
 
   useEffect(() => {
     if (!country) { setAreas([]); return; }
-    let active = true;
-    setAreasLoading(true);
+    let active = true; setAreasLoading(true);
     getAreas(country).then(value => active && setAreas(value)).catch(() => active && setAreas([])).finally(() => active && setAreasLoading(false));
     return () => { active = false; };
   }, [country]);
 
   useEffect(() => {
     if (!country || !area) { setTowns([]); return; }
-    let active = true;
-    getCities(country, area).then(value => active && setTowns(value)).catch(() => active && setTowns([]));
+    let active = true; getCities(country, area).then(value => active && setTowns(value)).catch(() => active && setTowns([]));
     return () => { active = false; };
   }, [country, area]);
 
@@ -88,11 +64,9 @@ export default function EditProfile() {
     if (!displayName.trim()) { Alert.alert('Add your name', 'Your profile needs a display name.'); return; }
     if (!/^[a-z0-9._-]{3,30}$/.test(normalizedHandle)) { Alert.alert('Choose a username', 'Use 3–30 letters, numbers, dots, underscores or hyphens.'); return; }
     try {
-      setSaving(true);
-      let avatarUrl = avatar;
+      setSaving(true); let avatarUrl = avatar;
       if (avatar && !avatar.startsWith('http')) {
-        const user = await getSessionUser();
-        if (!user) throw new Error('Please sign in again.');
+        const user = await getSessionUser(); if (!user) throw new Error('Please sign in again.');
         const media: MediaItem = { uri: avatar, type: 'image', name: 'avatar.jpg', mimeType: 'image/jpeg' };
         avatarUrl = (await uploadMedia(user.id, media, 'avatars')).url;
       }
@@ -101,19 +75,18 @@ export default function EditProfile() {
     } catch (error: any) { Alert.alert('Could not save profile', error?.message || 'Please try again.'); } finally { setSaving(false); }
   }
 
-  const updateLocationText = (kind: 'country' | 'area' | 'town', value: string) => {
-    setQuery(value);
+  function updateLocationText(kind: 'country' | 'area' | 'town', value: string) {
     if (kind === 'country') { setCountry(value); setArea(''); setTown(''); }
     if (kind === 'area') { setArea(value); setTown(''); }
     if (kind === 'town') setTown(value);
     setPicker(value.trim() ? kind : null);
-  };
-  const select = (value: string) => {
+  }
+  function select(value: string) {
     if (picker === 'country') { setCountry(value); setArea(''); setTown(''); }
     if (picker === 'area') { setArea(value); setTown(''); }
     if (picker === 'town') setTown(value);
-    setQuery(''); setPicker(null);
-  };
+    setPicker(null);
+  }
 
   if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -130,17 +103,7 @@ export default function EditProfile() {
       <Field label="Links" value={links} onChangeText={setLinks} placeholder="One link per line" multiline />
       <Text style={s.note}>Your links appear on your public profile. Your date of birth stays private.</Text>
     </ScrollView>
-  </KeyboardAvoidingView>
-  
-  </SafeAreaView>;
-}
-
-function Field({ label, value, onChangeText, placeholder, multiline = false, autoCapitalize = 'sentences' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; multiline?: boolean; autoCapitalize?: 'none' | 'sentences' }) {
-  return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.muted} multiline={multiline} autoCapitalize={autoCapitalize} style={[s.input, multiline && s.textarea]} /></View>;
-}
-
-function LocationField({ label, value, placeholder, onChangeText, disabled = false }: { label: string; value: string; placeholder: string; onChangeText: (value: string) => void; disabled?: boolean }) {
-  return <View style={s.field}><Text style={s.label}>{label}</Text><View style={[s.inputRow, disabled && s.selectorDisabled]}><TextInput value={value} editable={!disabled} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.muted} style={s.locationInput} autoCapitalize="words" />{value ? <Pressable onPress={() => onChangeText('')} style={s.clear}><Text style={s.clearText}>×</Text></Pressable> : null}</View></View>;
+  </KeyboardAvoidingView></SafeAreaView>;
 }
 
 function SuggestionList({ visible, query, options, onSelect, loading = false }: { visible: boolean; query: string; options: string[]; onSelect: (value: string) => void; loading?: boolean }) {
@@ -148,7 +111,12 @@ function SuggestionList({ visible, query, options, onSelect, loading = false }: 
   const filtered = options.filter(item => item.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8);
   return <View style={s.suggestions}>{loading ? <ActivityIndicator color={C.pink} style={{ padding: 12 }} /> : filtered.map(item => <Pressable key={item} onPress={() => onSelect(item)} style={s.suggestion}><Text style={s.suggestionText}>{item}</Text></Pressable>)}{!loading && !filtered.length ? <Text style={s.noSuggestions}>No matches</Text> : null}</View>;
 }
-
+function Field({ label, value, onChangeText, placeholder, multiline = false, autoCapitalize = 'sentences' }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; multiline?: boolean; autoCapitalize?: 'none' | 'sentences' }) {
+  return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.muted} multiline={multiline} autoCapitalize={autoCapitalize} style={[s.input, multiline && s.textarea]} /> </View>;
+}
+function LocationField({ label, value, placeholder, onChangeText, disabled = false }: { label: string; value: string; placeholder: string; onChangeText: (value: string) => void; disabled?: boolean }) {
+  return <View style={s.field}><Text style={s.label}>{label}</Text><View style={[s.inputRow, disabled && s.selectorDisabled]}><TextInput value={value} editable={!disabled} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={C.muted} style={s.locationInput} autoCapitalize="words" /></View></View>;
+}
 const s = StyleSheet.create({
-   safe:{flex:1,backgroundColor:C.bg},flex:{flex:1},center:{flex:1,alignItems:'center',justifyContent:'center'},top:{height:65,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:C.line},title:{fontSize:20,fontWeight:'900'},save:{color:C.pink,fontSize:14,fontWeight:'900'},scroll:{padding:20,paddingBottom:50},avatarButton:{alignSelf:'center',position:'relative',marginTop:5},avatar:{width:92,height:92,borderRadius:46},camera:{position:'absolute',right:0,bottom:0,width:30,height:30,borderRadius:15,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:C.bg},helper:{textAlign:'center',color:C.muted,fontSize:12,marginTop:9},field:{marginTop:18},label:{fontSize:13,fontWeight:'900',marginBottom:7},input:{minHeight:52,borderRadius:18,backgroundColor:'#FFF',paddingHorizontal:16,paddingVertical:14,borderWidth:1,borderColor:C.line,fontSize:15,color:C.ink},textarea:{minHeight:100,textAlignVertical:'top'},row:{flexDirection:'row',gap:10},half:{flex:1},note:{fontSize:12,lineHeight:17,color:C.muted,marginTop:18},inputRow:{minHeight:52,borderRadius:18,backgroundColor:'#FFF',borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center'},locationInput:{flex:1,minHeight:52,paddingHorizontal:14,fontSize:14,color:C.ink},selectorDisabled:{opacity:.55},suggestions:{marginTop:5,borderRadius:16,backgroundColor:'#FFF',borderWidth:1,borderColor:C.line,overflow:'hidden',maxHeight:210},suggestion:{paddingHorizontal:14,paddingVertical:12,borderBottomWidth:1,borderBottomColor:C.line},suggestionText:{fontSize:13,fontWeight:'700'},noSuggestions:{padding:12,color:C.muted,fontSize:12}
+  safe:{flex:1,backgroundColor:C.bg},flex:{flex:1},center:{flex:1,alignItems:'center',justifyContent:'center'},top:{height:65,paddingHorizontal:18,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:C.line},title:{fontSize:20,fontWeight:'900'},save:{color:C.pink,fontSize:14,fontWeight:'900'},scroll:{padding:20,paddingBottom:50},avatarButton:{alignSelf:'center',position:'relative',marginTop:5},avatar:{width:92,height:92,borderRadius:46},camera:{position:'absolute',right:0,bottom:0,width:30,height:30,borderRadius:15,backgroundColor:C.pink,alignItems:'center',justifyContent:'center',borderWidth:3,borderColor:C.bg},helper:{textAlign:'center',color:C.muted,fontSize:12,marginTop:9},field:{marginTop:18},label:{fontSize:13,fontWeight:'900',marginBottom:7},input:{minHeight:52,borderRadius:18,backgroundColor:'#FFF',paddingHorizontal:16,paddingVertical:14,borderWidth:1,borderColor:C.line,fontSize:15,color:C.ink},textarea:{minHeight:100,textAlignVertical:'top'},row:{flexDirection:'row',gap:10},half:{flex:1},note:{fontSize:12,lineHeight:17,color:C.muted,marginTop:18},inputRow:{minHeight:52,borderRadius:18,backgroundColor:'#FFF',borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center'},locationInput:{flex:1,minHeight:52,paddingHorizontal:14,fontSize:14,color:C.ink},selectorDisabled:{opacity:.55},suggestions:{marginTop:5,borderRadius:16,backgroundColor:'#FFF',borderWidth:1,borderColor:C.line,overflow:'hidden',maxHeight:210},suggestion:{paddingHorizontal:14,paddingVertical:12,borderBottomWidth:1,borderBottomColor:C.line},suggestionText:{fontSize:13,fontWeight:'700'},noSuggestions:{padding:12,color:C.muted,fontSize:12}
 });
