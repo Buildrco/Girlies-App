@@ -512,7 +512,7 @@ export type ProductRecord = {
   bid_min_price?: number | null;
   bid_ends_at?: string | null;
   created_at: string;
-  store?: { id: string; name: string; owner_id: string } | null;
+  store?: { id: string; name: string; owner_id: string; lat?: number | null; lng?: number | null } | null;
 };
 
 export async function createStore(input: { name: string; description: string; location?: string }) {
@@ -782,18 +782,23 @@ export async function createMarketplaceAnnouncement(input: {
 
 export async function getProducts(
   limit = 50,
-  options: { storeId?: string; category?: string; search?: string; productId?: string; includeOutOfStock?: boolean } = {},
+  options: { storeId?: string; category?: string; search?: string; productId?: string; includeOutOfStock?: boolean; minPrice?: number; maxPrice?: number; sort?: 'best_match' | 'price_low' | 'price_high' | 'ending_soon' | 'newest' } = {},
 ): Promise<ProductRecord[]> {
   let query = supabase
     .from('products')
-    .select('id,store_id,name,description,category,price,currency,stock,stock_status,gender,filters,delivery_options,bid_min_price,bid_ends_at,fulfillment,estimated_arrival,image_urls,attributes,created_at,stores(id,name,owner_id)')
-    .order('created_at', { ascending: false })
+    .select('id,store_id,name,description,category,price,currency,stock,stock_status,gender,filters,delivery_options,bid_min_price,bid_ends_at,fulfillment,estimated_arrival,image_urls,attributes,created_at,stores(id,name,owner_id,lat,lng)')
     .limit(Math.max(1, limit));
   if (options.storeId) query = query.eq('store_id', options.storeId);
   if (options.productId) query = query.eq('id', options.productId);
   if (!options.includeOutOfStock && !options.productId) query = query.neq('stock_status', 'out_of_stock');
   if (options.category) query = query.ilike('category', options.category);
   if (options.search?.trim()) query = query.ilike('name', `%${options.search.trim()}%`);
+  if (options.minPrice !== undefined && Number.isFinite(options.minPrice)) query = query.gte('price', options.minPrice);
+  if (options.maxPrice !== undefined && Number.isFinite(options.maxPrice)) query = query.lte('price', options.maxPrice);
+  if (options.sort === 'price_low') query = query.order('price', { ascending: true });
+  if (options.sort === 'price_high') query = query.order('price', { ascending: false });
+  if (options.sort === 'ending_soon') query = query.order('bid_ends_at', { ascending: true, nullsFirst: false });
+  if (options.sort === 'newest' || options.sort === 'best_match') query = query.order('created_at', { ascending: false });
   const { data, error } = await query;
   if (error) throw new Error(`Could not load products: ${errorMessage(error, 'Supabase rejected the request')}`);
   return (data || []).map((row: any) => ({
