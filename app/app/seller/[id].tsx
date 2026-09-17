@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../constants/theme';
@@ -21,30 +20,12 @@ function getMediaType(post: any, url: string, index: number): 'image' | 'video' 
   return VIDEO_URL_PATTERN.test(url) ? 'video' : 'image';
 }
 
-function SellerVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
-  const player = useVideoPlayer(url, currentPlayer => {
-    currentPlayer.loop = true;
-    currentPlayer.muted = true;
-    if (autoplay) currentPlayer.play();
-  });
-  useEffect(() => {
-    if (autoplay) player.play();
-    else player.pause();
-  }, [autoplay, player]);
-  return <VideoView player={player} style={s.mediaImage} nativeControls={false} contentFit="cover" />;
+function SellerVideo({ url: _url, autoplay: _autoplay }: { url: string; autoplay: boolean }) {
+  return <View style={[s.mediaImage, { backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#FFF', fontWeight: '900' }}>Video preview</Text></View>;
 }
 
-function FullscreenVideo({ url, autoplay }: { url: string; autoplay: boolean }) {
-  const player = useVideoPlayer(url, currentPlayer => {
-    currentPlayer.loop = false;
-    currentPlayer.muted = true;
-    if (autoplay) currentPlayer.play();
-  });
-  useEffect(() => {
-    if (autoplay) player.play();
-    else player.pause();
-  }, [autoplay, player]);
-  return <VideoView player={player} style={s.viewerVideo} nativeControls contentFit="contain" />;
+function FullscreenVideo({ url: _url, autoplay: _autoplay }: { url: string; autoplay: boolean }) {
+  return <View style={[s.viewerVideo, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}><Text style={{ color: '#FFF', fontWeight: '900' }}>Video playback unavailable</Text></View>;
 }
 
 export default function Seller() {
