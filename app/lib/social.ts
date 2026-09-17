@@ -22,6 +22,21 @@ const MIME_EXTENSIONS: Record<string, string> = {
   'video/3gpp': '3gp',
 };
 
+export function normalizeImageUrls(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(item => normalizeImageUrls(item)).filter(Boolean);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed !== value) return normalizeImageUrls(parsed);
+    } catch { /* plain URL */ }
+    return [trimmed];
+  }
+  if (value && typeof value === 'object' && 'url' in value) return normalizeImageUrls((value as { url?: unknown }).url);
+  return [];
+}
+
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === 'object' && error && 'message' in error) {
@@ -540,7 +555,7 @@ export async function getServices(ownerId?: string) {
   if (error) throw new Error(`Could not load services: ${errorMessage(error, 'Supabase rejected the request')}`);
   return (data || []).map((row: any) => ({
     ...row,
-    image_urls: Array.isArray(row.image_urls) ? row.image_urls : [],
+    image_urls: normalizeImageUrls(row.image_urls),
     filters: row.filters && typeof row.filters === 'object' ? row.filters : {},
   })) as ServiceRecord[];
 }
