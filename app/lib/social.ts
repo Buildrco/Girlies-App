@@ -522,7 +522,7 @@ export type ProductRecord = {
   store?: { id: string; name: string; owner_id: string; lat?: number | null; lng?: number | null } | null;
 };
 
-export async function createStore(input: { name: string; description: string; location?: string }) {
+export async function createStore(input: { name: string; description: string; location?: string; categories?: string[]; bannerUrls?: string[] }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to create your shop.');
   const name = input.name.trim();
@@ -534,17 +534,21 @@ export async function createStore(input: { name: string; description: string; lo
     name,
     slug,
     description: input.description.trim(),
-  }).select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at').single();
+    categories: input.categories || [],
+    banner_urls: input.bannerUrls || [],
+  }).select('id,owner_id,name,slug,description,categories,banner_urls,lat,lng,rating,verification_status,created_at').single();
   if (error) throw new Error(`Shop creation failed: ${errorMessage(error, 'Supabase rejected the shop')}`);
   return data;
 }
 
-export async function updateStore(storeId: string, input: { name: string; description: string }) {
+export async function updateStore(storeId: string, input: { name: string; description: string; categories?: string[]; bannerUrls?: string[] }) {
   const user = await getSessionUser();
   if (!user) throw new Error('Please sign in to edit your shop.');
   const { data, error } = await supabase.from('stores').update({
     name: input.name.trim(),
     description: input.description.trim(),
+    ...(input.categories ? { categories: input.categories } : {}),
+    ...(input.bannerUrls ? { banner_urls: input.bannerUrls } : {}),
   }).eq('id', storeId).eq('owner_id', user.id).select().single();
   if (error) throw new Error(`Shop update failed: ${errorMessage(error, 'Supabase rejected the shop')}`);
   return data;
@@ -825,7 +829,7 @@ export async function getStore(identifier: string) {
     if (!user) throw new Error('Please sign in to view your shop.');
     const result = await supabase
       .from('stores')
-    .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+    .select('id,owner_id,name,slug,description,categories,banner_urls,lat,lng,rating,verification_status,created_at')
       .eq('owner_id', user.id)
       .maybeSingle();
     store = result.data;
@@ -833,7 +837,7 @@ export async function getStore(identifier: string) {
   } else {
     const bySlug = await supabase
       .from('stores')
-      .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+      .select('id,owner_id,name,slug,description,categories,banner_urls,lat,lng,rating,verification_status,created_at')
       .eq('slug', identifier)
       .maybeSingle();
     store = bySlug.data;
@@ -841,7 +845,7 @@ export async function getStore(identifier: string) {
     if (!store && !storeError) {
       const byId = await supabase
         .from('stores')
-        .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+        .select('id,owner_id,name,slug,description,categories,banner_urls,lat,lng,rating,verification_status,created_at')
         .eq('id', identifier)
         .maybeSingle();
       store = byId.data;
@@ -850,7 +854,7 @@ export async function getStore(identifier: string) {
     if (!store && !storeError) {
       const byOwner = await supabase
         .from('stores')
-        .select('id,owner_id,name,slug,description,lat,lng,rating,verification_status,created_at')
+        .select('id,owner_id,name,slug,description,categories,banner_urls,lat,lng,rating,verification_status,created_at')
         .eq('owner_id', identifier)
         .maybeSingle();
       store = byOwner.data;

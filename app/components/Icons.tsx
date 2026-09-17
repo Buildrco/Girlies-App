@@ -26,6 +26,14 @@ const icons: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled?: 
   gift: { outline: 'gift-outline', filled: 'gift' },
   chart: { outline: 'stats-chart-outline', filled: 'stats-chart' },
   shield: { outline: 'shield-checkmark-outline', filled: 'shield-checkmark' },
+  hair: { outline: 'cut-outline' },
+  beauty: { outline: 'sparkles-outline', filled: 'sparkles' },
+  fashion: { outline: 'shirt-outline', filled: 'shirt' },
+  fragrance: { outline: 'flower-outline', filled: 'flower' },
+  gadgets: { outline: 'phone-portrait-outline', filled: 'phone-portrait' },
+  appliances: { outline: 'flash-outline', filled: 'flash' },
+  furniture: { outline: 'bed-outline', filled: 'bed' },
+  intimates: { outline: 'heart-circle-outline', filled: 'heart-circle' },
 };
 const navIcons: Record<string, { outline: string; filled: string }> = {
   home: { outline: 'home-outline', filled: 'home' },

@@ -9,6 +9,7 @@ import { ProductCard } from '../../components/ProductCard';
 import { LikeButton } from '../../components/LikeButton';
 import { addComment, addShare, deletePost, getProducts, getSessionUser, getStore, reportPost, setFollow, setPostLike, setPostPreference } from '../../lib/social';
 import { supabase } from '../../lib/supabase';
+import { MARKETPLACE_CATEGORIES } from '../../constants/categories';
 
 type SellerMedia = { url: string; type: 'image' | 'video'; postId: string; body: string; likeCount: number };
 
@@ -228,6 +229,9 @@ export default function Seller() {
   const owner = store.owner;
   const location = [owner?.area && owner?.location ? `${owner.area} - ${owner.location}` : owner?.area || owner?.location, owner?.country].filter(Boolean).join(', ');
   const autoplay = owner?.video_autoplay !== false;
+  const sellerCategories = (Array.isArray(store.categories) && store.categories.length
+    ? MARKETPLACE_CATEGORIES.filter(category => store.categories.includes(category.slug))
+    : MARKETPLACE_CATEGORIES);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -250,6 +254,18 @@ export default function Seller() {
             <Pressable onPress={toggleFollow} style={s.follow}><Text style={s.buttonText}>{following ? 'Following' : 'Follow'}</Text></Pressable>
             <Pressable style={s.message} onPress={() => router.push('/chat')}><Text style={s.messageText}>Message</Text></Pressable>
           </View>
+        </View>
+        <View style={s.sectionHeader}>
+          <View><Text style={s.sectionTitle}>Shop by category</Text><Text style={s.sectionMeta}>Only what this seller carries</Text></View>
+        </View>
+        <View style={s.categoryGrid}>
+          {sellerCategories.map(category => (
+            <Pressable key={category.slug} style={[s.categoryCard, { backgroundColor: category.color }]} onPress={() => router.push({ pathname: '/shop/category/[slug]', params: { slug: category.slug, store: store.slug } })}>
+              <Image source={{ uri: category.image }} style={s.categoryImage} />
+              <View style={s.categoryShade} />
+              <View style={s.categoryCopy}><View style={s.categoryIcon}><I name={category.icon} size={18} color={C.ink} filled /></View><Text style={s.categoryName}>{category.label}</Text><Text style={s.categorySub}>{category.subtitle}</Text></View>
+            </Pressable>
+          ))}
         </View>
         {sellerMedia.length > 0 && (
           <>
@@ -336,6 +352,14 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '900' },
   sectionMeta: { fontSize: 11, color: C.muted },
   mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  categoryCard: { width: '48.5%', height: 155, borderRadius: 22, overflow: 'hidden', position: 'relative' },
+  categoryImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  categoryShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0003' },
+  categoryCopy: { position: 'absolute', left: 11, right: 9, bottom: 11 },
+  categoryIcon: { width: 29, height: 29, borderRadius: 15, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', marginBottom: 7 },
+  categoryName: { color: '#FFF', fontSize: 15, fontWeight: '900' },
+  categorySub: { color: '#FFF', fontSize: 9, fontWeight: '700', marginTop: 2 },
   mediaCard: { width: '48.5%', height: 180, borderRadius: 20, overflow: 'hidden', backgroundColor: C.rose },
   mediaImage: { width: '100%', height: '100%' },
   videoBadge: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, backgroundColor: '#0009', alignItems: 'center', justifyContent: 'center' },

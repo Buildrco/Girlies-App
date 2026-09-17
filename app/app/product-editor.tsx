@@ -6,8 +6,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { createMarketplaceAnnouncement, createProduct, createStore, deleteProduct, getCurrentProfile, getProducts, getStore, updateProduct, type MediaItem } from '../lib/social';
+import { MARKETPLACE_CATEGORIES } from '../constants/categories';
 
-const categories = ['Hair', 'Beauty', 'Fashion', 'Fragrance', 'Bags', 'Jewellery', 'Shoes', 'Home'];
+const categories = MARKETPLACE_CATEGORIES.map(category => category.label);
 const fulfillmentOptions = ['Local delivery', 'Pickup', 'Ships nationwide'];
 const genderOptions = ['All', 'Women only', 'Men only'];
 const filterOptions = ['New', 'Handmade', 'Imported', 'Plus size', 'Vegan', 'Giftable'];

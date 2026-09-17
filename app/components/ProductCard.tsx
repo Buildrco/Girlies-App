@@ -35,7 +35,7 @@ export function ProductCard({ name, price, image, images, seller, verified = tru
     <View style={{ height: gridWidth ? 170 : 190, borderRadius: 28, overflow: 'hidden', backgroundColor: '#F1E9EC', position: 'relative' }}>
       <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} nestedScrollEnabled>{(images?.filter(Boolean).length ? images.filter(Boolean) : [image]).map((uri, index) => <Image key={uri + '-' + index} source={{ uri }} style={{ width: cardWidth, height: '100%' }} resizeMode="cover" />)}</ScrollView>
       <View style={{ position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}><LikeButton liked={liked} onPress={() => void toggleLike()} size={19} /></View>
-      <Animated.View style={[cardStyles.cartButton, { transform: [{ scale: addScale }] }]}><Pressable onPress={addToCart} style={cardStyles.cartPress}><I name={adding ? 'check' : 'cart'} size={18} color="#FFF" filled={!adding} /></Pressable></Animated.View>
+      <Animated.View style={[cardStyles.cartButton, { transform: [{ scale: addScale }] }]}><Pressable onPress={addToCart} style={cardStyles.cartPress}><I name={adding ? 'check' : 'cart'} size={19} color={C.pink} filled={!adding} /></Pressable></Animated.View>
     </View>
     <Text style={{ fontSize: 14, fontWeight: '900', marginTop: 9 }} numberOfLines={1}>{name}</Text>
     <Text style={{ fontSize: 13, color: C.muted, marginTop: 2 }} numberOfLines={1}>{seller}{verified ? '  ✓' : ''}</Text>
@@ -44,6 +44,6 @@ export function ProductCard({ name, price, image, images, seller, verified = tru
 }
 
 const cardStyles = {
-  cartButton: { position: 'absolute' as const, right: 10, bottom: 10, width: 42, height: 42, borderRadius: 21, backgroundColor: C.ink, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 5 },
+  cartButton: { position: 'absolute' as const, right: 0, bottom: 0, width: 54, height: 46, borderTopLeftRadius: 24, backgroundColor: '#FFF', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 8, elevation: 5 },
   cartPress: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
 };
