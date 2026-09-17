@@ -1,17 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable, TextInput, StyleSheet, Image, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { VideoView, useVideoPlayer } from 'expo-video';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { createPost, type MediaItem } from '../lib/social';
 
-function VideoPreview({ url }: { url: string }) {
-  const player = useVideoPlayer(url, currentPlayer => { currentPlayer.loop = true; currentPlayer.muted = true; });
-  useEffect(() => { player.pause(); }, [player]);
-  return <VideoView player={player} style={s.media} nativeControls contentFit="cover" />;
+function VideoPreview({ url: _url }: { url: string }) {
+  return <View style={[s.media, s.video]}><Text style={s.videoText}>Video preview</Text></View>;
 }
 
 export default function Create() {
