@@ -234,6 +234,13 @@ export async function updateCurrentProfile(input: {
   return baseUpdate.data as ProfileRecord;
 }
 
+export async function updateVideoAutoplay(enabled: boolean) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to update video preferences.');
+  const { error } = await supabase.from('profiles').update({ video_autoplay: enabled }).eq('id', user.id);
+  if (error) throw new Error(`Could not save video preference: ${errorMessage(error, 'Supabase rejected the preference')}`);
+}
+
 export async function getCountries(): Promise<CountryOption[]> {
   const response = await fetch('https://countriesnow.space/api/v0.1/countries/positions');
   if (!response.ok) throw new Error('Could not load countries.');
