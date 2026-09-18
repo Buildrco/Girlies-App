@@ -103,7 +103,7 @@ export default function CategoryScreen() {
            {activeFilterCount > 0 && <View style={s.filterCount}><Text style={s.filterCountText}>{activeFilterCount}</Text></View>}
          </Pressable>
        </View>
-       <View style={s.resultHead}><Text style={s.resultTitle}>{visibleProducts.length ? `${visibleProducts.length} listings` : 'Products'}</Text><Text style={s.resultMeta}>Latest first</Text></View>
+        <View style={s.resultHead}><Text style={s.resultTitle}>{visibleProducts.length ? `${visibleProducts.length} listings` : 'Products'}</Text><Text style={s.resultMeta}>{sortOptions.find(item => item[0] === sort)?.[1]}</Text></View>
       {loading && <View style={s.state}><ActivityIndicator color={C.pink} /><Text style={s.stateText}>Loading {category.label.toLowerCase()}…</Text></View>}
       {!loading && error && <View style={s.state}><Text style={s.stateText}>{error}</Text></View>}
        {!loading && !error && !visibleProducts.length && <View style={s.state}><Text style={s.stateEmoji}>✦</Text><Text style={s.emptyTitle}>Nothing here yet</Text><Text style={s.stateText}>{store ? 'This seller has not added products in this category.' : 'New products will appear here as sellers list them.'}</Text></View>}
