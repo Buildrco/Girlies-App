@@ -7,6 +7,7 @@ begin
  return result;
 end; $$;
 grant execute on function public.get_seller_studio_metrics(uuid,timestamptz,timestamptz) to authenticated;
+drop function if exists public.get_seller_studio_visitors(uuid,timestamptz,timestamptz);
 create or replace function public.get_seller_studio_visitors(p_store_id uuid, p_start timestamptz default now() - interval '30 days', p_end timestamptz default now()) returns table(user_id uuid, display_name text, handle text, avatar_url text, last_seen timestamptz, visits bigint) language plpgsql security definer set search_path = public as $$
 declare v_owner_id uuid;
 begin
