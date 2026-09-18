@@ -222,8 +222,6 @@ export default function Seller() {
       Alert.alert('Comment failed', e?.message || 'Please try again.');
     }
   }
-
-  if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   if (!store) return <SafeAreaView style={s.safe}><View style={s.center}><Text style={s.name}>Seller unavailable</Text><Text style={s.meta}>{error}</Text><Pressable onPress={() => router.back()} style={s.message}><Text style={s.messageText}>Go back</Text></Pressable></View></SafeAreaView>;
 
   const owner = store.owner;
