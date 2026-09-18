@@ -26,9 +26,9 @@ export default function Chat(){
       <View style={s.top}><View><Text style={s.k}>MESSAGES</Text><Text style={s.h}>Your conversations</Text></View><Pressable><I name="settings" size={23}/></Pressable></View>
       <View style={s.search}><I name="search" size={21} color={C.muted}/><TextInput value={q} onChangeText={setQ} placeholder="Search chats" placeholderTextColor={C.muted} style={s.input}/></View>
       <Pressable onPress={()=>r.push('/lumi')} style={s.lumi}><View style={s.magic}><Text>🪄</Text></View><View style={{flex:1}}><Text style={s.lumiName}>Lumi</Text><Text style={s.lumiText}>Ask me about anything in Herlo.</Text></View><Text style={{fontWeight:'900'}}>›</Text></Pressable>
-      {loading&&<View style={s.state}><ActivityIndicator color={C.pink}/></View>}
-      {!loading&&error&&<View style={s.state}><Text style={s.stateText}>{error}</Text><Pressable onPress={load}><Text style={s.retry}>Try again</Text></Pressable></View>}
-      {!loading&&!error&&visible.map((x,i)=><Pressable key={x.id} onPress={()=>r.push('/conversation/'+x.id)} style={s.row}>
+      
+      {error&&<View style={s.state}><Text style={s.stateText}>{error}</Text><Pressable onPress={load}><Text style={s.retry}>Try again</Text></Pressable></View>}
+      {!error&&visible.map((x,i)=><Pressable key={x.id} onPress={()=>r.push('/conversation/'+x.id)} style={s.row}>
         <Avatar size={51} uri={x.avatar_url} index={i} verified={x.verified}/>
         <View style={{flex:1}}><View style={s.nameLine}><Text style={s.name}>{x.name}</Text><Text style={s.time}>{x.time}</Text></View><Text style={s.preview} numberOfLines={1}>{x.preview}</Text></View>
         {x.unread>0&&<View style={s.unread}><Text>{x.unread}</Text></View>}
