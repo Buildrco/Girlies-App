@@ -620,7 +620,7 @@ export async function updateService(serviceId: string, input: { name: string; de
 }
 
 export async function getServices(ownerId?: string) {
-  let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').order('created_at', { ascending: false }).limit(80);
+  let query = supabase.from('services').select('id,owner_id,name,description,category,price,duration_minutes,delivery_options,filters,image_urls,created_at').order('created_at', { ascending: false, nullsFirst: false }).limit(80);
   if (ownerId) query = query.eq('owner_id', ownerId);
   const { data, error } = await query;
   if (error) throw new Error(`Could not load services: ${errorMessage(error, 'Supabase rejected the request')}`);
@@ -807,9 +807,9 @@ export async function getProducts(
   if (options.minPrice !== undefined && Number.isFinite(options.minPrice)) query = query.gte('price', options.minPrice);
   if (options.maxPrice !== undefined && Number.isFinite(options.maxPrice)) query = query.lte('price', options.maxPrice);
   if (options.sort === 'price_low') query = query.order('price', { ascending: true });
-  if (options.sort === 'price_high') query = query.order('price', { ascending: false });
-  if (options.sort === 'ending_soon') query = query.order('bid_ends_at', { ascending: true, nullsFirst: false });
-  if (options.sort === 'newest' || options.sort === 'best_match') query = query.order('created_at', { ascending: false });
+  else if (options.sort === 'price_high') query = query.order('price', { ascending: false });
+  else if (options.sort === 'ending_soon') query = query.order('bid_ends_at', { ascending: true, nullsFirst: false });
+  else query = query.order('created_at', { ascending: false, nullsFirst: false });
   const { data, error } = await query;
   if (error) throw new Error(`Could not load products: ${errorMessage(error, 'Supabase rejected the request')}`);
   return (data || []).map((row: any) => ({
