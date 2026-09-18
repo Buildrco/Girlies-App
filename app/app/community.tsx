@@ -117,6 +117,13 @@ export default function Community() {
       setCommentCounts({});
       setLoading(false);
 
+      // Let the first post frame reach the screen before any secondary
+      // response handlers or hydration state updates run on the JS thread.
+      await new Promise<void>(resolve => {
+        InteractionManager.runAfterInteractions(resolve);
+      });
+      if (!isCurrentLoad(generation)) return;
+
       const [profilesResult, storiesResult, likesResult, commentsResult, profileResult, sessionResult] = await Promise.allSettled([
         authorIds.length
           ? waitFor(supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,video_autoplay').in('id', authorIds))
