@@ -103,8 +103,6 @@ export default function ProductEditor() {
       }
     } catch (error: any) { Alert.alert(editingId ? 'Could not update product' : 'Could not publish product', error?.message || 'Please try again.'); } finally { setSaving(false); }
   }
-
-  if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}><View style={s.flex}>
     <View style={s.top}><Pressable onPress={() => router.back()}><I name="back" size={30} /></Pressable><Text style={s.h}>{editingId ? 'Edit product' : 'Add product'}</Text><Pressable disabled={saving} onPress={save}>{saving ? <ActivityIndicator color={C.pink} /> : <Text style={s.publish}>Save</Text>}</Pressable></View>
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
