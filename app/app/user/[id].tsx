@@ -47,7 +47,6 @@ export default function UserProfile() {
     })();
     return () => { active = false; };
   }, [userId]);
-  if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   if (!profile) return <SafeAreaView style={s.safe}><View style={s.center}><Text style={s.title}>Profile unavailable</Text><Pressable style={s.primary} onPress={() => router.back()}><Text style={s.primaryText}>Go back</Text></Pressable></View></SafeAreaView>;
   const media = posts.flatMap(post => (post.media_urls || []).filter(Boolean).map((url, index) => ({ url, type: profileMediaType(post, url, index) }))); 
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
