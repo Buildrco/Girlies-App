@@ -11,15 +11,7 @@ import { useCart } from '../../../lib/cart';
 
 const sortOptions = [['best_match', 'Recommended'], ['newest', 'Recently added'], ['price_low', 'Price: Low to High'], ['price_high', 'Price: High to Low']] as const;
 type SelectionKind = 'sort' | 'buying' | 'condition' | 'category' | 'price' | 'delivery';
-const SERVICE_CATEGORY = {
-  slug: 'services',
-  label: 'Services',
-  subtitle: 'Book trusted talent for your next plan',
-  icon: 'beauty',
-  color: '#F6A7D4',
-  image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=85',
-  subcategories: ['Hair services', 'Beauty services', 'Nails', 'Wellness', 'Photography', 'Events'],
-};
+const SERVICE_CATEGORY = getCategory('services');
 const SUBCATEGORY_IMAGES: Record<string, string> = {
   Wigs: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=500&q=85',
   Bundles: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=500&q=85',
