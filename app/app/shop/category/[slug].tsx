@@ -84,6 +84,8 @@ export default function CategoryScreen() {
   const [draftMax, setDraftMax] = useState('');
   const [draftSort, setDraftSort] = useState<(typeof sortOptions)[number][0]>('best_match');
   const [draftCondition, setDraftCondition] = useState('');
+  const [categoryOption, setCategoryOption] = useState('');
+  const [draftCategoryOption, setDraftCategoryOption] = useState('');
   const [buyingFormat, setBuyingFormat] = useState<'all' | 'buy_now' | 'auction'>('all');
   const [draftBuyingFormat, setDraftBuyingFormat] = useState<'all' | 'buy_now' | 'auction'>('all');
   const [deliveryOption, setDeliveryOption] = useState('');
@@ -117,25 +119,26 @@ export default function CategoryScreen() {
     ? MARKETPLACE_CATEGORIES.filter(item => store.categories.includes(item.slug))
     : MARKETPLACE_CATEGORIES, [isServices, store]);
   const visibleProducts = useMemo(() => products.filter(product => {
-    if (!matchesCategoryFilter(product, condition) || !hasDelivery(product, deliveryOption)) return false;
+    if (!matchesCategoryFilter(product, condition) || !matchesCategoryFilter(product, categoryOption) || !hasDelivery(product, deliveryOption)) return false;
     if (buyingFormat === 'all') return true;
     const auction = Boolean(product.bid_min_price || (product.attributes as any)?.bid_enabled);
     return buyingFormat === 'auction' ? auction : !auction;
-  }), [products, condition, deliveryOption, buyingFormat]);
+  }), [products, condition, categoryOption, deliveryOption, buyingFormat]);
   const visibleServices = useMemo(() => {
-    const filtered = services.filter(service => matchesServiceFilter(service, condition) && hasDelivery(service, deliveryOption));
+    const filtered = services.filter(service => matchesServiceFilter(service, condition) && matchesServiceFilter(service, categoryOption) && hasDelivery(service, deliveryOption));
     if (sort === 'price_low') return [...filtered].sort((a, b) => Number(a.price) - Number(b.price));
     if (sort === 'price_high') return [...filtered].sort((a, b) => Number(b.price) - Number(a.price));
     return filtered;
-  }, [services, condition, deliveryOption, sort]);
+  }, [services, condition, categoryOption, deliveryOption, sort]);
   const resultCount = isServices ? visibleServices.length : visibleProducts.length;
-  const activeFilterCount = [condition, minPrice, maxPrice, deliveryOption, buyingFormat === 'all' ? '' : buyingFormat].filter(Boolean).length;
+  const activeFilterCount = [condition, categoryOption, minPrice, maxPrice, deliveryOption, buyingFormat === 'all' ? '' : buyingFormat].filter(Boolean).length;
 
   function openFilters() {
     setDraftMin(minPrice);
     setDraftMax(maxPrice);
     setDraftSort(sort);
     setDraftCondition(condition);
+    setDraftCategoryOption(categoryOption);
     setDraftBuyingFormat(buyingFormat);
     setDraftDeliveryOption(deliveryOption);
     setFilterOpen(true);
@@ -146,6 +149,7 @@ export default function CategoryScreen() {
     setMaxPrice(draftMax);
     setSort(draftSort);
     setCondition(draftCondition);
+    setCategoryOption(draftCategoryOption);
     setBuyingFormat(draftBuyingFormat);
     setDeliveryOption(draftDeliveryOption);
     setFilterOpen(false);
@@ -161,7 +165,7 @@ export default function CategoryScreen() {
       <View style={s.top}><Pressable onPress={() => router.back()} style={s.back}><I name="back" size={27} /></Pressable><View style={s.topCopy}><Text style={s.k}>{store ? store.name.toUpperCase() : 'MARKETPLACE'}</Text><Text style={s.h}>{category.label}</Text></View></View>
       <View style={[s.hero, { backgroundColor: category.color }]}><Image source={{ uri: category.image }} style={s.heroImage} /><View style={s.heroTint} /><View style={s.heroCopy}><View style={s.icon}><I name={category.icon} size={24} color={C.ink} filled /></View><Text style={s.heroTitle}>{category.subtitle}</Text><Text style={s.heroText}>{isServices ? 'Choose a provider and book your next appointment.' : store ? `Only ${store.name}'s ${category.label.toLowerCase()} picks.` : 'Discover products from shops across the marketplace.'}</Text></View></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRail}><Pressable style={s.changeChip} onPress={() => router.replace(storeSlug ? { pathname: '/seller/[id]', params: { id: storeSlug } } : '/shop')}><Text style={s.changeText}>{isServices ? 'Marketplace' : 'All categories'}</Text></Pressable>{visibleCategories.map(item => <Pressable key={item.slug} onPress={() => routeToCategory(item.slug)} style={[s.categoryChip, item.slug === category.slug && s.categoryChipOn]}><I name={item.icon} size={15} color={item.slug === category.slug ? '#FFF' : C.ink} filled /><Text style={[s.categoryText, item.slug === category.slug && s.categoryTextOn]}>{item.label}</Text></Pressable>)}</ScrollView>
-      <Text style={s.subheading}>{isServices ? 'Choose a service type' : `Explore ${category.label.toLowerCase()}`}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subRail}>{category.subcategories.map(item => <Pressable key={item} accessibilityLabel={item} style={s.subChip} onPress={() => { setDraftCondition(item); setCondition(item); }}><Image source={{ uri: SUBCATEGORY_IMAGES[item] || category.image }} style={s.subImage} /></Pressable>)}</ScrollView>
+      <Text style={s.subheading}>{isServices ? 'Choose a service type' : `Explore ${category.label.toLowerCase()}`}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subRail}>{category.subcategories.map(item => <Pressable key={item} accessibilityLabel={item} style={s.subChip} onPress={() => { setDraftCategoryOption(item); setCategoryOption(item); }}><Image source={{ uri: SUBCATEGORY_IMAGES[item] || category.image }} style={s.subImage} /></Pressable>)}</ScrollView>
        <View style={s.controlRow}>
          <Pressable style={[s.controlButton, sort !== 'best_match' && s.controlButtonOn]} onPress={openSort}>
            <Text style={s.sortGlyph}>⇅</Text>
@@ -197,7 +201,7 @@ export default function CategoryScreen() {
         <View style={s.modalBackdrop}>
           <View style={s.filterSheet}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.filterContent}>
-              <View style={s.sheetTop}><Pressable onPress={() => setFilterOpen(false)}><I name="back" size={25} /></Pressable><Text style={s.sheetTitle}>Filter {category.label}</Text><Pressable onPress={() => { setDraftMin(''); setDraftMax(''); setDraftSort('best_match'); setDraftCondition(''); setDraftBuyingFormat('all'); setDraftDeliveryOption(''); }}><Text style={s.reset}>Reset</Text></Pressable></View>
+              <View style={s.sheetTop}><Pressable onPress={() => setFilterOpen(false)}><I name="back" size={25} /></Pressable><Text style={s.sheetTitle}>Filter {category.label}</Text><Pressable onPress={() => { setDraftMin(''); setDraftMax(''); setDraftSort('best_match'); setDraftCondition(''); setDraftCategoryOption(''); setDraftBuyingFormat('all'); setDraftDeliveryOption(''); }}><Text style={s.reset}>Reset</Text></Pressable></View>
               <FilterRow label="Sort" value={sortOptions.find(item => item[0] === draftSort)?.[1] || 'Recommended'} onPress={() => { setFilterOpen(false); setTimeout(openSort, 160); }} />
               {!isServices && <><Text style={s.sheetLabel}>Buying format</Text>
               <View style={s.optionWrap}><Pressable onPress={() => setDraftBuyingFormat('all')} style={[s.option, draftBuyingFormat === 'all' && s.optionOn]}><Text style={[s.optionText, draftBuyingFormat === 'all' && s.optionTextOn]}>All listings</Text></Pressable><Pressable onPress={() => setDraftBuyingFormat('buy_now')} style={[s.option, draftBuyingFormat === 'buy_now' && s.optionOn]}><Text style={[s.optionText, draftBuyingFormat === 'buy_now' && s.optionTextOn]}>Buy it now</Text></Pressable><Pressable onPress={() => setDraftBuyingFormat('auction')} style={[s.option, draftBuyingFormat === 'auction' && s.optionOn]}><Text style={[s.optionText, draftBuyingFormat === 'auction' && s.optionTextOn]}>Auction</Text></Pressable></View></>}
@@ -205,9 +209,9 @@ export default function CategoryScreen() {
               <View style={s.optionWrap}><Pressable onPress={() => setDraftCondition('')} style={[s.option, !draftCondition && s.optionOn]}><Text style={[s.optionText, !draftCondition && s.optionTextOn]}>Any</Text></Pressable>{['New', 'Used', 'Handmade'].map(value => <Pressable key={value} onPress={() => setDraftCondition(value)} style={[s.option, draftCondition === value && s.optionOn]}><Text style={[s.optionText, draftCondition === value && s.optionTextOn]}>{value}</Text></Pressable>)}</View>
               <FilterRow label="Price" value={draftMin || draftMax ? `${draftMin ? `GH₵${draftMin}+` : ''}${draftMax ? ` up to GH₵${draftMax}` : ''}` : 'Any price'} />
               <View style={s.priceRow}><TextInput value={draftMin} onChangeText={setDraftMin} keyboardType="numeric" placeholder="Minimum" style={s.priceInput} /><TextInput value={draftMax} onChangeText={setDraftMax} keyboardType="numeric" placeholder="Maximum" style={s.priceInput} /></View>
-              <FilterRow label={isServices ? 'Service category' : 'Category'} value={category.label} />
+              <FilterRow label={isServices ? 'Service category' : 'Category'} value={draftCategoryOption || category.label} />
               <Text style={s.sheetLabel}>{category.label} options</Text>
-              <View style={s.optionWrap}>{category.subcategories.map(value => <Pressable key={value} onPress={() => setDraftCondition(value)} style={[s.option, draftCondition === value && s.optionOn]}><Text style={[s.optionText, draftCondition === value && s.optionTextOn]}>{value}</Text></Pressable>)}</View>
+              <View style={s.optionWrap}>{category.subcategories.map(value => <Pressable key={value} onPress={() => setDraftCategoryOption(value)} style={[s.option, draftCategoryOption === value && s.optionOn]}><Text style={[s.optionText, draftCategoryOption === value && s.optionTextOn]}>{value}</Text></Pressable>)}</View>
               <FilterRow label={isServices ? 'Delivery' : 'Shipping and pickup'} value={draftDeliveryOption || 'All options'} />
               <View style={s.optionWrap}>{['Local delivery', 'Pickup', 'Ships nationwide'].map(value => <Pressable key={value} onPress={() => setDraftDeliveryOption(draftDeliveryOption === value ? '' : value)} style={[s.option, draftDeliveryOption === value && s.optionOn]}><Text style={[s.optionText, draftDeliveryOption === value && s.optionTextOn]}>{value}</Text></Pressable>)}</View>
               <Pressable style={s.apply} onPress={applyFilters}><Text style={s.applyText}>Show results</Text></Pressable>
