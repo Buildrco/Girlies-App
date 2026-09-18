@@ -20,7 +20,7 @@ export default function Product(){
  useEffect(()=>{let mounted=true;(async()=>{if(!productId){if(mounted){setError('Product could not be loaded.');setLoading(false);}return;}try{
    setLoading(true);setProduct(null);setSeller(null);setError('');
     const{data:p,error:pError}=await supabase.from('products').select('id,name,description,category,price,currency,stock,fulfillment,estimated_arrival,image_urls,attributes,store_id').eq('id',productId).maybeSingle();
-   if(pError)throw pError;if(!p){setError('This listing is no longer available.');return;}if(!mounted)return;setProduct(p as Product);void recordSellerEvent({ storeId: p.store_id, productId: p.id, eventType: 'view', source: 'Shop' });
+   if(pError)throw pError;if(!p){setError('This listing is no longer available.');return;}if(!mounted)return;setProduct(p as Product);void recordSellerEvent({ storeId: p.store_id, productId: p.id, eventType: 'view', source: 'Shop' });void recordSellerEvent({ storeId: p.store_id, productId: p.id, eventType: 'product_click', source: 'Shop' });
    const{data:store,error:storeError}=await supabase.from('stores').select('owner_id,name,rating,lat,lng,verification_status').eq('id',p.store_id).maybeSingle();
    if(storeError)throw storeError;
    if(store){const{data:profile,error:profileError}=await supabase.from('profiles').select('id,display_name,handle,avatar_url,verified,country,area,location').eq('id',store.owner_id).maybeSingle();if(profileError)throw profileError;
