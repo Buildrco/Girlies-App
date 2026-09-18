@@ -103,6 +103,13 @@ export default function Profile() {
   }, [load]);
 
   const tabNames = ['Posts', 'Shop', 'Services'];
+  function updatePagerTab(offsetX: number) {
+    const next = Math.min(tabNames.length - 1, Math.max(0, Math.round(offsetX / pagerWidth)));
+    if (next !== tabIndex) {
+      setTabIndex(next);
+      setTab(tabNames[next]);
+    }
+  }
   function selectTab(index: number) {
     setTabIndex(index);
     setTab(tabNames[index]);
@@ -128,7 +135,23 @@ export default function Profile() {
       <View style={s.cover}><View style={s.coverShape} /><View style={s.avatarWrap}><Avatar size={92} uri={profile.avatar_url} verified={profile.verified} /></View></View>
       <View style={s.info}><Text style={s.name}>{profile.display_name} {profile.verified && <VerifiedMark size={16} />}</Text><Text style={s.handle}>@{profile.handle}</Text><Text style={s.bio}>{profile.bio || 'Share your latest moments with the girls.'}</Text>{publicPlace && <Text style={s.place}><I name="location" size={14} color={C.muted} /> {publicPlace}</Text>}{profile.links?.length ? <View style={s.links}>{profile.links.map(link => <Text key={link} style={s.link}>{link}</Text>)}</View> : null}<Text style={s.join}>Joined {new Date(profile.created_at).toLocaleDateString()}</Text><View style={s.stats}><View><Text style={s.num}>{profile.followers_count}</Text><Text style={s.label}>Followers</Text></View><View><Text style={s.num}>{profile.following_count}</Text><Text style={s.label}>Following</Text></View></View><View style={s.actions}><Pressable style={s.edit} onPress={() => router.push('/edit-profile')}><Text style={{ fontWeight: '900' }}>Edit profile</Text></Pressable><Pressable style={s.shopBtn} onPress={() => router.push('/seller/me')}><I name="shop" size={18} color="#FFF" /><Text style={{ color: '#FFF', fontWeight: '900' }}>My shop</Text></Pressable></View></View>
        <View style={s.tabs}>{tabNames.map((item, index) => <Pressable key={item} onPress={() => selectTab(index)} style={s.tab}><Text style={{ fontWeight: '900', fontSize: 12, color: index === tabIndex ? C.ink : C.muted }}>{item}</Text></Pressable>)}<Animated.View style={[s.tabUnderline, { width: tabWidth, transform: [{ translateX: tabScrollX.interpolate({ inputRange: [0, pagerWidth, pagerWidth * 2], outputRange: [0, tabWidth, tabWidth * 2] }) }] }]} /></View>
-       <Animated.ScrollView ref={pagerRef} horizontal pagingEnabled nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: tabScrollX } } }], { useNativeDriver: false })} onMomentumScrollEnd={event => { const next = Math.round(event.nativeEvent.contentOffset.x / pagerWidth); setTabIndex(next); setTab(tabNames[next]); }}>
+        <Animated.ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          nestedScrollEnabled
+          directionalLockEnabled
+          bounces={false}
+          overScrollMode="never"
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={event => {
+            const offsetX = event.nativeEvent.contentOffset.x;
+            tabScrollX.setValue(offsetX);
+            updatePagerTab(offsetX);
+          }}
+          onMomentumScrollEnd={event => updatePagerTab(event.nativeEvent.contentOffset.x)}
+        >
          <View style={[s.tabPage, { width: pagerWidth }]}><View style={s.posts}>{posts.map(post => <View key={post.id} style={s.post}><View style={s.postHeader}><Avatar size={38} uri={profile.avatar_url} verified={profile.verified} /><View style={{ flex: 1 }}><Text style={s.postName}>{profile.display_name} {profile.verified && <VerifiedMark size={13} />}</Text><Text style={s.postMeta}>@{profile.handle} · {new Date(post.created_at).toLocaleDateString()}</Text></View></View>{post.body ? <Text style={s.postBody}>{post.body}</Text> : null}{(post.media_urls || []).filter(Boolean).map((image, index) => getMediaType(post, image, index) === 'video' ? <ProfileVideo key={`${image}-${index}`} url={image} /> : <Image key={`${image}-${index}`} source={{ uri: image }} style={s.postImage} />)}<View style={s.postActions}><View style={s.action}><LikeButton liked={liked.has(post.id)} onPress={() => void toggleLike(post.id)} size={21} /><Text style={s.actionText}>{likeCounts[post.id] || 0} · Like</Text></View><Pressable style={s.action} onPress={() => setCommenting(commenting === post.id ? null : post.id)}><I name="chat" size={20} /><Text style={s.actionText}>Comment</Text></Pressable><Pressable style={s.action} onPress={() => addShare(post.id).catch((e: any) => Alert.alert('Share failed', e?.message || 'Could not share this post.'))}><I name="share" size={20} /><Text style={s.actionText}>Share</Text></Pressable></View>{commenting === post.id && <View style={s.commentBox}><TextInput value={comment} onChangeText={setComment} placeholder="Write a comment…" placeholderTextColor={C.muted} style={s.commentInput} /><Pressable onPress={() => void publishComment(post.id)}><I name="send" size={22} color={C.pink} /></Pressable></View>}</View>)}{!posts.length && <View style={s.empty}><Text style={{ fontSize: 30 }}>✦</Text><Text style={s.emptyTitle}>No posts yet</Text><Text style={s.emptyText}>Your real posts will appear here.</Text></View>}</View></View>
          <View style={[s.tabPage, { width: pagerWidth }]}><View style={s.shopGrid}>{products.map(product => <Pressable key={product.id} style={s.product} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })}>{product.image_urls?.[0] ? <Image source={{ uri: product.image_urls[0] }} style={s.productImage} /> : <View style={[s.productImage, s.productPlaceholder]}><I name="shop" size={20} color={C.pink} /></View>}<Text style={s.productName} numberOfLines={1}>{product.name}</Text><Text style={s.productPrice}>GH₵ {Number(product.price).toFixed(0)}</Text></Pressable>)}{!products.length && <View style={s.empty}><Text style={{ fontSize: 30 }}>✦</Text><Text style={s.emptyTitle}>Your shop is empty</Text><Text style={s.emptyText}>Add products from My shop.</Text></View>}</View></View>
          <View style={[s.tabPage, { width: pagerWidth }]}><View style={s.serviceList}>{services.map(service => <Pressable key={service.id} style={s.service} onPress={() => router.push({ pathname: '/service/[id]', params: { id: service.id } })}>{service.image_urls?.[0] ? <Image source={{ uri: service.image_urls[0] }} style={s.serviceImage} /> : null}<Text style={s.productName}>{service.name}</Text><Text style={s.emptyText}>{service.category} · {service.duration_minutes} min</Text><Text style={s.productPrice}>GH₵ {Number(service.price).toFixed(0)}</Text></Pressable>)}{!services.length && <View style={s.empty}><Text style={{ fontSize: 30 }}>✦</Text><Text style={s.emptyTitle}>Your services</Text><Text style={s.emptyText}>Add a service from Seller Studio.</Text></View>}</View></View>
