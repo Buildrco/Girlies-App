@@ -26,7 +26,7 @@ export default function Shop() {
   async function loadProducts() {
     try {
       setLoading(true);
-      const rows = await getProducts(80, { category: selectedCategory });
+      const rows = selectedCategory === 'Services' ? [] : await getProducts(80, { category: selectedCategory });
       setProducts(rows);
       setError('');
     } catch (e: any) {
