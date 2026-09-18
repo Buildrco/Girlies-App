@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, ScrollView, View, Text, Pressable, StyleSheet, Image, TextInput, Alert, useWindowDimensions } from 'react-native';
-import * as Location from 'expo-location';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, View, Text, Pressable, StyleSheet, Image, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -12,41 +11,19 @@ import { getProducts, getServices, type ProductRecord } from '../lib/social';
 import { MARKETPLACE_CATEGORIES } from '../constants/categories';
 import { useCart } from '../lib/cart';
 
-const sortOptions = [['best_match', 'Best match'], ['price_low', 'Lowest price'], ['price_high', 'Highest price'], ['ending_soon', 'Ending soonest'], ['newest', 'Newly listed'], ['nearest', 'Nearest first']] as const;
-const categoryFilters = (category: string) => {
-  const key = category.toLowerCase();
-  if (key.includes('hair')) return ['Straight', 'Body wave', 'Long length', 'Lace front', 'New', 'Custom'];
-  if (key.includes('beauty')) return ['Skin care', 'Makeup', 'Vegan', 'Cruelty-free', 'New'];
-  if (key.includes('fashion')) return ['Dresses', 'Tops', 'Shoes', 'Plus size', 'Handmade', 'New'];
-  if (key.includes('fragrance')) return ['Perfume', 'Body mist', 'Giftable', 'Imported', 'New'];
-  if (key.includes('gadget')) return ['Apple', 'Samsung', 'Audio', 'New', 'Imported'];
-  if (key.includes('appliance')) return ['Kitchen', 'Cleaning', 'Cooling', 'New'];
-  if (key.includes('furniture')) return ['Living room', 'Bedroom', 'Office', 'New'];
-  return ['New', 'Handmade', 'Imported', 'Giftable'];
-};
-
 export default function Shop() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
   const { count } = useCart();
   const { width } = useWindowDimensions();
   const heroWidth = Math.max(1, width - 36);
+  const heroGap = 12;
   const heroRef = useRef<ScrollView>(null);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [sort, setSort] = useState<(typeof sortOptions)[number][0]>('best_match');
-  const [condition, setCondition] = useState('');
-  const [draftMin, setDraftMin] = useState('');
-  const [draftMax, setDraftMax] = useState('');
-  const [draftSort, setDraftSort] = useState<(typeof sortOptions)[number][0]>('best_match');
-  const [draftCondition, setDraftCondition] = useState('');
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const selectedCategory = MARKETPLACE_CATEGORIES[categoryIndex].label;
 
   async function loadProducts() {
@@ -55,9 +32,6 @@ export default function Shop() {
       const [rows, serviceRows] = await Promise.all([
         getProducts(80, {
           category: selectedCategory,
-          minPrice: minPrice ? Number(minPrice) : undefined,
-          maxPrice: maxPrice ? Number(maxPrice) : undefined,
-          sort: sort === 'nearest' ? 'best_match' : sort,
         }),
         getServices(),
       ]);
@@ -71,45 +45,7 @@ export default function Shop() {
     }
   }
 
-  useEffect(() => { void loadProducts(); }, [selectedCategory, minPrice, maxPrice, sort]);
-
-  const visibleProducts = useMemo(() => {
-    const matching = products.filter(product => {
-      if (condition && !Object.keys(product.filters || {}).some(key => key.toLowerCase() === condition.toLowerCase())) return false;
-      return true;
-    });
-    if (sort !== 'nearest') return matching;
-    const distance = (product: ProductRecord) => {
-      if (!coordinates || product.store?.lat == null || product.store?.lng == null) return Number.POSITIVE_INFINITY;
-      const lat = (product.store.lat - coordinates.latitude) * 111;
-      const lng = (product.store.lng - coordinates.longitude) * 111 * Math.cos(coordinates.latitude * Math.PI / 180);
-      return Math.sqrt(lat * lat + lng * lng);
-    };
-    return [...matching].sort((a, b) => distance(a) - distance(b));
-  }, [products, condition, sort, coordinates]);
-
-  function openFilters() {
-    setDraftMin(minPrice); setDraftMax(maxPrice); setDraftSort(sort); setDraftCondition(condition); setFilterOpen(true);
-  }
-
-  async function applyFilters() {
-    if (draftSort === 'nearest') {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Location needed', 'Allow location access to sort listings by distance.');
-        return;
-      }
-      const position = await Location.getCurrentPositionAsync({}).catch(() => null);
-      if (position) setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-    }
-    setMinPrice(draftMin); setMaxPrice(draftMax); setSort(draftSort); setCondition(draftCondition); setFilterOpen(false);
-  }
-
-  function selectHero(index: number) {
-    setCategoryIndex(index);
-    setCondition('');
-    heroRef.current?.scrollTo({ x: index * heroWidth, animated: true });
-  }
+  useEffect(() => { void loadProducts(); }, [selectedCategory]);
 
   return <SafeAreaView style={s.safe}>
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
@@ -124,14 +60,16 @@ export default function Shop() {
       <ScrollView
         ref={heroRef}
         horizontal
-        pagingEnabled
         decelerationRate="fast"
-        snapToInterval={heroWidth}
+         disableIntervalMomentum
+         snapToInterval={heroWidth + heroGap}
+         snapToAlignment="start"
+         contentContainerStyle={{ gap: heroGap }}
         style={[s.heroRail, { width: heroWidth }]}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={event => {
-          const next = Math.round(event.nativeEvent.contentOffset.x / heroWidth);
-          if (next !== categoryIndex) { setCategoryIndex(next); setCondition(''); }
+           const next = Math.min(MARKETPLACE_CATEGORIES.slice(0, 4).length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / (heroWidth + heroGap))));
+           if (next !== categoryIndex) setCategoryIndex(next);
         }}
       >
         {MARKETPLACE_CATEGORIES.slice(0, 4).map(category => (
@@ -154,15 +92,13 @@ export default function Shop() {
         </Pressable>)}
       </View>
 
-      <Pressable style={s.filterButton} onPress={openFilters}><I name="filter" size={18} /><Text style={s.filterButtonText}>Filters and sorting</Text><Text style={s.filterSummary}>{[minPrice && `GH₵${minPrice}+`, maxPrice && `up to GH₵${maxPrice}`, condition, sortOptions.find(item => item[0] === sort)?.[1]].filter(Boolean).join(' · ')}</Text></Pressable>
       <SectionTitle title={`Fresh finds in ${selectedCategory}`} />
       {loading && <View style={s.state}><Text style={s.stateText}>Loading products…</Text></View>}
       {!loading && error && <View style={s.state}><Text style={s.stateText}>{error}</Text></View>}
-      {!loading && !error && !visibleProducts.length && <View style={s.state}><Text style={s.stateText}>No products match these filters yet.</Text></View>}
-      <View style={s.grid}>{visibleProducts.map(product => <ProductCard key={product.id} gridWidth="48%" productId={product.id} images={product.image_urls} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</View>
+       {!loading && !error && !products.length && <View style={s.state}><Text style={s.stateText}>No products in this category yet.</Text></View>}
+       <View style={s.grid}>{products.map(product => <ProductCard key={product.id} gridWidth="48%" productId={product.id} images={product.image_urls} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</View>
       {!!services.length && <><SectionTitle title="Services" /><View style={s.services}>{services.map(service => <Pressable key={service.id} style={s.service} onPress={() => router.push({ pathname: '/service/[id]', params: { id: service.id } })}>{service.image_urls?.[0] ? <Image source={{ uri: service.image_urls[0] }} style={s.serviceImage} /> : null}<Text style={s.serviceName}>{service.name}</Text><Text style={s.serviceMeta}>{service.category} · {service.duration_minutes} min</Text><Text style={s.servicePrice}>GH₵ {Number(service.price).toFixed(0)}</Text></Pressable>)}</View></>}
     </ScrollView>
-    <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}><View style={s.modalBackdrop}><View style={s.sheet}><View style={s.sheetTop}><Text style={s.sheetTitle}>Filter marketplace</Text><Pressable onPress={() => setFilterOpen(false)}><Text style={s.close}>×</Text></Pressable></View><Text style={s.label}>Price range</Text><View style={s.priceRow}><TextInput value={draftMin} onChangeText={setDraftMin} keyboardType="numeric" placeholder="Minimum" style={s.priceInput} /><TextInput value={draftMax} onChangeText={setDraftMax} keyboardType="numeric" placeholder="Maximum" style={s.priceInput} /></View><Text style={s.label}>Sort by</Text><View style={s.optionWrap}>{sortOptions.map(([value, label]) => <Pressable key={value} onPress={() => setDraftSort(value)} style={[s.option, draftSort === value && s.optionOn]}><Text style={[s.optionText, draftSort === value && s.optionTextOn]}>{label}</Text></Pressable>)}</View><Text style={s.label}>Category filters · {selectedCategory}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.optionWrap}><Pressable onPress={() => setDraftCondition('')} style={[s.option, !draftCondition && s.optionOn]}><Text style={[s.optionText, !draftCondition && s.optionTextOn]}>Any</Text></Pressable>{categoryFilters(selectedCategory).map(value => <Pressable key={value} onPress={() => setDraftCondition(value)} style={[s.option, draftCondition === value && s.optionOn]}><Text style={[s.optionText, draftCondition === value && s.optionTextOn]}>{value}</Text></Pressable>)}</ScrollView><Pressable style={s.apply} onPress={() => void applyFilters()}><Text style={s.applyText}>Apply filters</Text></Pressable></View></View></Modal>
   </SafeAreaView>;
 }
 
@@ -199,9 +135,6 @@ const s = StyleSheet.create({
   categoryIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   categoryTitle: { color: '#FFF', fontSize: 17, fontWeight: '900' },
   categorySubtitle: { color: '#FFF', fontSize: 10, fontWeight: '700', marginTop: 3 },
-  filterButton: { marginTop: 18, padding: 15, borderRadius: 22, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: C.line },
-  filterButtonText: { fontWeight: '900' },
-  filterSummary: { flex: 1, color: C.muted, fontSize: 10, textAlign: 'right' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
   services: { gap: 8 },
   service: { padding: 16, borderRadius: 20, backgroundColor: '#FFF' },
@@ -211,19 +144,4 @@ const s = StyleSheet.create({
   servicePrice: { fontSize: 13, color: C.pink, fontWeight: '900', marginTop: 6 },
   state: { padding: 20, alignItems: 'center' },
   stateText: { fontSize: 12, color: C.muted, textAlign: 'center' },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#0007' },
-  sheet: { maxHeight: '88%', backgroundColor: C.bg, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, paddingBottom: 35 },
-  sheetTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sheetTitle: { fontSize: 20, fontWeight: '900' },
-  close: { fontSize: 30 },
-  label: { fontSize: 12, fontWeight: '900', marginTop: 18, marginBottom: 9 },
-  priceRow: { flexDirection: 'row', gap: 10 },
-  priceInput: { flex: 1, backgroundColor: '#FFF', borderRadius: 16, padding: 13, borderWidth: 1, borderColor: C.line },
-  optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  option: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 18, backgroundColor: '#FFF', borderWidth: 1, borderColor: C.line },
-  optionOn: { backgroundColor: C.ink, borderColor: C.ink },
-  optionText: { fontSize: 11, fontWeight: '800' },
-  optionTextOn: { color: '#FFF' },
-  apply: { marginTop: 22, borderRadius: 23, backgroundColor: C.pink, padding: 15, alignItems: 'center' },
-  applyText: { color: '#FFF', fontWeight: '900' },
 });
