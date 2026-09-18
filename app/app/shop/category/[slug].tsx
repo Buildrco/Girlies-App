@@ -233,7 +233,7 @@ export default function CategoryScreen() {
          </Pressable>
        </View>
         <View style={s.resultHead}><Text style={s.resultTitle}>{resultCount ? `${resultCount} ${isServices ? 'services' : 'listings'}` : isServices ? 'Services' : 'Products'}</Text><Text style={s.resultMeta}>{sortOptions.find(item => item[0] === sort)?.[1]}</Text></View>
-      {loading && <View style={s.state}><ActivityIndicator color={C.pink} /><Text style={s.stateText}>Loading {category.label.toLowerCase()}…</Text></View>}
+      
       {!loading && error && <View style={s.state}><Text style={s.stateText}>{error}</Text></View>}
         {!loading && !error && !resultCount && <View style={s.state}><Text style={s.stateEmoji}>✦</Text><Text style={s.emptyTitle}>Nothing here yet</Text><Text style={s.stateText}>{isServices ? 'New services will appear here as providers publish them.' : store ? 'This seller has not added products in this category.' : 'New products will appear here as sellers list them.'}</Text></View>}
         {!isServices && <View style={s.grid}>{visibleProducts.map(product => <ProductCard key={product.id} gridWidth="48%" productId={product.id} images={product.image_urls} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</View>}
