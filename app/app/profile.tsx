@@ -125,7 +125,6 @@ export default function Profile() {
     if (!comment.trim()) return;
     try { await addComment(postId, comment); setComment(''); setCommenting(null); } catch (e: any) { Alert.alert('Comment failed', e?.message || 'Could not save your comment.'); }
   }
-  if (!ready) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   if (!profile) return <SafeAreaView style={s.safe}><View style={s.center}><Text style={s.emptyTitle}>Sign in to view your profile</Text><Text style={s.emptyText}>{error || 'Your posts and shop will appear here after authentication.'}</Text><Pressable style={s.shopBtn} onPress={() => router.push('/login')}><Text style={{ color: '#FFF', fontWeight: '900' }}>Sign in</Text></Pressable></View></SafeAreaView>;
 
   const publicPlace = [profile.area && profile.location ? `${profile.area} - ${profile.location}` : profile.area || profile.location, profile.country].filter(Boolean).join(', ');
