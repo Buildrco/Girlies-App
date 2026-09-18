@@ -6,8 +6,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { createMarketplaceAnnouncement, createService, deleteService, getService, updateService, type MediaItem } from '../lib/social';
+import { MARKETPLACE_CATEGORIES } from '../constants/categories';
 
-const categories = ['Beauty', 'Hair', 'Fashion', 'Photography', 'Events', 'Consulting'];
+const categories = MARKETPLACE_CATEGORIES.find(category => category.slug === 'services')?.subcategories || ['Beauty services', 'Photography', 'Delivery'];
 const delivery = ['At my location', 'Mobile service', 'Online'];
 
 export default function ServiceEditor() {
