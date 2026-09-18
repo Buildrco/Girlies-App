@@ -30,7 +30,7 @@ export default function Shop() {
   const { onScroll } = useChromeVisibility();
   const { count } = useCart();
   const { width } = useWindowDimensions();
-  const heroWidth = width;
+  const heroWidth = Math.max(1, width - 36);
   const heroRef = useRef<ScrollView>(null);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -175,7 +175,7 @@ const s = StyleSheet.create({
   cartCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
   count: { position: 'absolute', right: -3, top: -4, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 10, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
   countText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
-  heroRail: { marginTop: 17, marginHorizontal: -18 },
+  heroRail: { marginTop: 17 },
   hero: { height: 220, borderRadius: 34, overflow: 'hidden', position: 'relative', backgroundColor: C.rose, marginRight: 0 },
   heroImg: { position: 'absolute', right: -10, bottom: 0, width: '65%', height: '100%', resizeMode: 'cover' },
   heroColor: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '60%', opacity: .93 },
