@@ -1073,3 +1073,20 @@ export async function sendMessage(conversationId: string, body: string) {
   if (error) throw new Error(`Message failed: ${errorMessage(error, 'Supabase rejected the message')}`);
   return data as ChatMessage;
 }
+
+
+export type SellerStudioTransaction = { id: string; amount: number; status: string; fulfillment_status: string; created_at: string };
+export type SellerStudioMetrics = { products: number; services: number; orders: number; paid_orders: number; gross_revenue: number; pending_revenue: number; visitors: number; views: number; engagement: number; clicks: number; carts: number; checkouts: number; purchases: number; customers: number; withdrawn: number; transactions: SellerStudioTransaction[] };
+const EMPTY_SELLER_METRICS: SellerStudioMetrics = { products: 0, services: 0, orders: 0, paid_orders: 0, gross_revenue: 0, pending_revenue: 0, visitors: 0, views: 0, engagement: 0, clicks: 0, carts: 0, checkouts: 0, purchases: 0, customers: 0, withdrawn: 0, transactions: [] };
+export async function getSellerStudioMetrics(storeId: string, days = 30): Promise<SellerStudioMetrics> {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 86400000);
+  const { data, error } = await supabase.rpc('get_seller_studio_metrics', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
+  if (error) throw new Error(`Could not load seller analytics: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return { ...EMPTY_SELLER_METRICS, ...(data || {}) };
+}
+export async function recordSellerEvent(input: { storeId: string; eventType: 'impression' | 'view' | 'engagement' | 'product_click' | 'cart' | 'checkout' | 'purchase'; source: string; productId?: string; sessionId?: string; metadata?: Record<string, unknown> }) {
+  const user = await getSessionUser().catch(() => null);
+  const { error } = await supabase.from('seller_events').insert({ store_id: input.storeId, product_id: input.productId || null, actor_id: user?.id || null, session_id: input.sessionId || null, event_type: input.eventType, source: input.source, metadata: input.metadata || {} });
+  if (error) console.warn('Could not record seller event:', error.message);
+}
