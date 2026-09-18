@@ -7,7 +7,7 @@ import { I } from '../components/Icons';
 import { ProductCard } from '../components/ProductCard';
 import { useChromeVisibility } from '../components/BottomNav';
 import { SectionTitle } from '../components/SectionTitle';
-import { getProducts, getServices, type ProductRecord } from '../lib/social';
+import { getProducts, type ProductRecord } from '../lib/social';
 import { MARKETPLACE_CATEGORIES } from '../constants/categories';
 import { useCart } from '../lib/cart';
 
@@ -21,7 +21,6 @@ export default function Shop() {
   const heroRef = useRef<ScrollView>(null);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [products, setProducts] = useState<ProductRecord[]>([]);
-  const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const selectedCategory = MARKETPLACE_CATEGORIES[categoryIndex].label;
@@ -29,14 +28,8 @@ export default function Shop() {
   async function loadProducts() {
     try {
       setLoading(true);
-      const [rows, serviceRows] = await Promise.all([
-        getProducts(80, {
-          category: selectedCategory,
-        }),
-        getServices(),
-      ]);
+      const rows = await getProducts(80, { category: selectedCategory });
       setProducts(rows);
-      setServices(serviceRows);
       setError('');
     } catch (e: any) {
       setError(e?.message || 'Could not load products.');
@@ -51,8 +44,8 @@ export default function Shop() {
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.top}>
         <View><Text style={s.k}>SHOP</Text><Text style={s.h}>Find your next thing.</Text></View>
-        <Pressable style={s.cartCircle} onPress={() => router.push('/cart')}>
-          <I name="bag" size={23} color="#FFF" filled />
+         <Pressable style={s.cartCircle} onPress={() => router.push('/cart')}>
+           <I name="cart" size={19} color="#FFF" filled />
           {count > 0 && <View style={s.count}><Text style={s.countText}>{count > 99 ? '99+' : count}</Text></View>}
         </Pressable>
       </View>
@@ -68,11 +61,11 @@ export default function Shop() {
         style={[s.heroRail, { width: heroWidth }]}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={event => {
-           const next = Math.min(MARKETPLACE_CATEGORIES.slice(0, 4).length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / (heroWidth + heroGap))));
+           const next = Math.min(MARKETPLACE_CATEGORIES.length - 1, Math.max(0, Math.round(event.nativeEvent.contentOffset.x / (heroWidth + heroGap))));
            if (next !== categoryIndex) setCategoryIndex(next);
         }}
       >
-        {MARKETPLACE_CATEGORIES.slice(0, 4).map(category => (
+         {MARKETPLACE_CATEGORIES.map(category => (
           <Pressable key={category.slug} style={[s.hero, { width: heroWidth }]} onPress={() => router.push({ pathname: '/shop/category/[slug]', params: { slug: category.slug } })}>
             <Image source={{ uri: category.image }} style={s.heroImg} />
             <View style={[s.heroColor, { backgroundColor: category.color }]} />
@@ -81,7 +74,7 @@ export default function Shop() {
           </Pressable>
         ))}
       </ScrollView>
-      <View style={s.dots}>{MARKETPLACE_CATEGORIES.slice(0, 4).map((category, index) => <View key={category.slug} style={[s.dot, index === categoryIndex && s.dotOn]} />)}</View>
+       <View style={s.dots}>{MARKETPLACE_CATEGORIES.map((category, index) => <View key={category.slug} style={[s.dot, index === categoryIndex && s.dotOn]} />)}</View>
 
       <View style={s.sectionIntro}><View><Text style={s.sectionEyebrow}>BROWSE THE MARKET</Text><Text style={s.sectionHeading}>Shop by category</Text></View><Text style={s.sectionHint}>Pick a lane, then explore.</Text></View>
       <View style={s.categoryGrid}>
@@ -91,13 +84,18 @@ export default function Shop() {
           <View style={s.categoryCopy}><View style={s.categoryIcon}><I name={category.icon} size={20} color={C.ink} filled /></View><Text style={s.categoryTitle}>{category.label}</Text><Text style={s.categorySubtitle}>{category.subtitle}</Text></View>
         </Pressable>)}
       </View>
+       <Pressable style={s.servicesBanner} onPress={() => router.push({ pathname: '/shop/category/[slug]', params: { slug: 'services' } })}>
+         <Image source={{ uri: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=85' }} style={s.servicesBannerImage} />
+         <View style={s.servicesBannerShade} />
+         <View style={s.servicesBannerCopy}><Text style={s.servicesEyebrow}>BOOK A SERVICE</Text><Text style={s.servicesTitle}>Find your next appointment.</Text><Text style={s.servicesText}>Hair, beauty, wellness and more from trusted providers.</Text></View>
+         <View style={s.servicesArrow}><I name="forward" size={21} color={C.ink} /></View>
+       </Pressable>
 
       <SectionTitle title={`Fresh finds in ${selectedCategory}`} />
       {loading && <View style={s.state}><Text style={s.stateText}>Loading products…</Text></View>}
       {!loading && error && <View style={s.state}><Text style={s.stateText}>{error}</Text></View>}
        {!loading && !error && !products.length && <View style={s.state}><Text style={s.stateText}>No products in this category yet.</Text></View>}
        <View style={s.grid}>{products.map(product => <ProductCard key={product.id} gridWidth="48%" productId={product.id} images={product.image_urls} name={product.name} price={`${product.currency === 'GHS' ? 'GH₵' : product.currency} ${Number(product.price || 0).toFixed(0)}`} image={product.image_urls?.[0] || ''} seller={product.store?.name || 'Seller'} onPress={() => router.push({ pathname: '/product', params: { id: product.id } })} />)}</View>
-      {!!services.length && <><SectionTitle title="Services" /><View style={s.services}>{services.map(service => <Pressable key={service.id} style={s.service} onPress={() => router.push({ pathname: '/service/[id]', params: { id: service.id } })}>{service.image_urls?.[0] ? <Image source={{ uri: service.image_urls[0] }} style={s.serviceImage} /> : null}<Text style={s.serviceName}>{service.name}</Text><Text style={s.serviceMeta}>{service.category} · {service.duration_minutes} min</Text><Text style={s.servicePrice}>GH₵ {Number(service.price).toFixed(0)}</Text></Pressable>)}</View></>}
     </ScrollView>
   </SafeAreaView>;
 }
@@ -108,7 +106,7 @@ const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   k: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3, color: C.muted },
   h: { fontSize: 27, fontWeight: '900', marginTop: 4 },
-  cartCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
+  cartCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
   count: { position: 'absolute', right: -3, top: -4, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 10, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
   countText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
   heroRail: { marginTop: 17 },
@@ -128,7 +126,7 @@ const s = StyleSheet.create({
   sectionHeading: { fontSize: 21, fontWeight: '900', marginTop: 4 },
   sectionHint: { maxWidth: 100, textAlign: 'right', color: C.muted, fontSize: 10, lineHeight: 14 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  categoryCard: { width: '48.5%', height: 170, borderRadius: 24, overflow: 'hidden', position: 'relative' },
+  categoryCard: { width: '48.5%', height: 138, borderRadius: 22, overflow: 'hidden', position: 'relative' },
   categoryImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   categoryShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0003' },
   categoryCopy: { position: 'absolute', left: 13, right: 10, bottom: 13 },
@@ -136,12 +134,14 @@ const s = StyleSheet.create({
   categoryTitle: { color: '#FFF', fontSize: 17, fontWeight: '900' },
   categorySubtitle: { color: '#FFF', fontSize: 10, fontWeight: '700', marginTop: 3 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12 },
-  services: { gap: 8 },
-  service: { padding: 16, borderRadius: 20, backgroundColor: '#FFF' },
-  serviceImage: { width: '100%', height: 140, borderRadius: 15, marginBottom: 9 },
-  serviceName: { fontSize: 14, fontWeight: '900' },
-  serviceMeta: { fontSize: 11, color: C.muted, marginTop: 4 },
-  servicePrice: { fontSize: 13, color: C.pink, fontWeight: '900', marginTop: 6 },
+  servicesBanner: { height: 146, borderRadius: 24, overflow: 'hidden', position: 'relative', marginTop: 12 },
+  servicesBannerImage: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  servicesBannerShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#17131888' },
+  servicesBannerCopy: { position: 'absolute', left: 17, right: 62, bottom: 17 },
+  servicesEyebrow: { color: '#FFF', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  servicesTitle: { color: '#FFF', fontSize: 21, lineHeight: 24, fontWeight: '900', marginTop: 5 },
+  servicesText: { color: '#FFF', fontSize: 11, lineHeight: 15, fontWeight: '700', marginTop: 5 },
+  servicesArrow: { position: 'absolute', right: 16, top: 16, width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' },
   state: { padding: 20, alignItems: 'center' },
   stateText: { fontSize: 12, color: C.muted, textAlign: 'center' },
 });
