@@ -30,6 +30,7 @@ export default function Shop() {
   const { onScroll } = useChromeVisibility();
   const { count } = useCart();
   const { width } = useWindowDimensions();
+  const heroWidth = width;
   const heroRef = useRef<ScrollView>(null);
   const [categoryIndex, setCategoryIndex] = useState(0);
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -107,7 +108,7 @@ export default function Shop() {
   function selectHero(index: number) {
     setCategoryIndex(index);
     setCondition('');
-    heroRef.current?.scrollTo({ x: index * (width - 36), animated: true });
+    heroRef.current?.scrollTo({ x: index * heroWidth, animated: true });
   }
 
   return <SafeAreaView style={s.safe}>
@@ -125,16 +126,16 @@ export default function Shop() {
         horizontal
         pagingEnabled
         decelerationRate="fast"
-        snapToInterval={width - 36}
+        snapToInterval={heroWidth}
+        style={[s.heroRail, { width: heroWidth }]}
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={event => {
-          const next = Math.round(event.nativeEvent.contentOffset.x / (width - 36));
+          const next = Math.round(event.nativeEvent.contentOffset.x / heroWidth);
           if (next !== categoryIndex) { setCategoryIndex(next); setCondition(''); }
         }}
-        style={s.heroRail}
       >
         {MARKETPLACE_CATEGORIES.slice(0, 4).map(category => (
-          <Pressable key={category.slug} style={[s.hero, { width: width - 36 }]} onPress={() => router.push({ pathname: '/shop/category/[slug]', params: { slug: category.slug } })}>
+          <Pressable key={category.slug} style={[s.hero, { width: heroWidth }]} onPress={() => router.push({ pathname: '/shop/category/[slug]', params: { slug: category.slug } })}>
             <Image source={{ uri: category.image }} style={s.heroImg} />
             <View style={[s.heroColor, { backgroundColor: category.color }]} />
             <View style={s.heroCopy}><Text style={s.heroCat}>{category.label.toUpperCase()}</Text><Text style={s.heroTitle}>{category.subtitle}</Text><Text style={s.heroSmall}>Tap to shop · swipe for more</Text></View>

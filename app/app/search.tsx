@@ -26,7 +26,7 @@ export default function Search() {
     if (filter === 'All') return true;
     if (['Hair', 'Beauty', 'Fashion', 'Fragrance'].includes(filter)) return product.category.toLowerCase() === filter.toLowerCase();
     if (filter === 'Women only' || filter === 'Men only') return product.gender === filter.toLowerCase();
-    if (filter === 'In stock') return product.stock_status !== 'out_of_stock' && product.stock > 0;
+    if (filter === 'In stock') return product.stock_status !== 'out_of_stock';
     return Number(product.price) < 500;
   }), [filter, products]);
 

@@ -22,6 +22,7 @@ const icons: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled?: 
   location: { outline: 'location-outline', filled: 'location' },
   filter: { outline: 'options-outline' },
   arrow: { outline: 'arrow-forward' },
+  forward: { outline: 'chevron-forward' },
   lock: { outline: 'lock-closed-outline', filled: 'lock-closed' },
   gift: { outline: 'gift-outline', filled: 'gift' },
   chart: { outline: 'stats-chart-outline', filled: 'stats-chart' },
