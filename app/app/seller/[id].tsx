@@ -7,7 +7,7 @@ import { I } from '../../components/Icons';
 import { Avatar, VerifiedMark } from '../../Avatar';
 import { ProductCard } from '../../components/ProductCard';
 import { LikeButton } from '../../components/LikeButton';
-import { addComment, addShare, deletePost, getProducts, getSessionUser, getStore, reportPost, setFollow, setPostLike, setPostPreference } from '../../lib/social';
+import { addComment, addShare, deletePost, getProducts, getSessionUser, getStore, recordSellerEvent, reportPost, setFollow, setPostLike, setPostPreference } from '../../lib/social';
 import { supabase } from '../../lib/supabase';
 import { MARKETPLACE_CATEGORIES } from '../../constants/categories';
 
@@ -64,6 +64,7 @@ export default function Seller() {
           supabase.from('posts').select('id,author_id,body,media_urls,metadata,created_at').eq('author_id', st.owner_id).eq('visibility', 'public').order('created_at', { ascending: false }).limit(30),
         ]);
         if (postsResult.error) throw postsResult.error;
+        if (me?.id !== st.owner_id) void recordSellerEvent({ storeId: st.id, eventType: 'view', source: 'Seller storefront' });
         const posts = postsResult.data || [];
         const postIds = posts.map((post: any) => post.id);
         const [likesResult, commentsResult] = await Promise.all([
