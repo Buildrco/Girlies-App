@@ -87,8 +87,6 @@ export default function EditProfile() {
     if (picker === 'town') setTown(value);
     setPicker(null);
   }
-
-  if (loading) return <SafeAreaView style={s.safe}><View style={s.center}><ActivityIndicator color={C.pink} /></View></SafeAreaView>;
   return <SafeAreaView style={s.safe}><KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <View style={s.top}><Pressable onPress={() => router.back()}><I name="back" size={30} /></Pressable><Text style={s.title}>Edit profile</Text><Pressable disabled={saving} onPress={save}>{saving ? <ActivityIndicator color={C.pink} /> : <Text style={s.save}>Save</Text>}</Pressable></View>
     <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
