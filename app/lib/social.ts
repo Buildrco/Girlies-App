@@ -1077,6 +1077,7 @@ export async function sendMessage(conversationId: string, body: string) {
 
 export type SellerStudioTransaction = { id: string; amount: number; status: string; fulfillment_status: string; created_at: string };
 export type SellerStudioMetrics = { products: number; services: number; orders: number; paid_orders: number; gross_revenue: number; pending_revenue: number; visitors: number; views: number; engagement: number; clicks: number; carts: number; checkouts: number; purchases: number; customers: number; withdrawn: number; transactions: SellerStudioTransaction[] };
+export type SellerStudioSeriesPoint = { date: string; revenue: number; orders: number; visitors: number; views: number; purchases: number };
 const EMPTY_SELLER_METRICS: SellerStudioMetrics = { products: 0, services: 0, orders: 0, paid_orders: 0, gross_revenue: 0, pending_revenue: 0, visitors: 0, views: 0, engagement: 0, clicks: 0, carts: 0, checkouts: 0, purchases: 0, customers: 0, withdrawn: 0, transactions: [] };
 export async function getSellerStudioMetrics(storeId: string, days = 30): Promise<SellerStudioMetrics> {
   const end = new Date();
@@ -1084,6 +1085,18 @@ export async function getSellerStudioMetrics(storeId: string, days = 30): Promis
   const { data, error } = await supabase.rpc('get_seller_studio_metrics', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
   if (error) throw new Error(`Could not load seller analytics: ${errorMessage(error, 'Supabase rejected the request')}`);
   return { ...EMPTY_SELLER_METRICS, ...(data || {}) };
+}
+export async function getSellerStudioSeries(storeId: string, days = 30): Promise<SellerStudioSeriesPoint[]> {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 86400000);
+  const { data, error } = await supabase.rpc('get_seller_studio_series', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
+  if (error) throw new Error(`Could not load seller chart: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return Array.isArray(data) ? data as SellerStudioSeriesPoint[] : [];
+}
+export async function requestSellerPayout(storeId: string, amount: number) {
+  const { data, error } = await supabase.rpc('request_seller_payout', { p_store_id: storeId, p_amount: amount });
+  if (error) throw new Error(`Could not request withdrawal: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return data;
 }
 export async function recordSellerEvent(input: { storeId: string; eventType: 'impression' | 'view' | 'engagement' | 'product_click' | 'cart' | 'checkout' | 'purchase'; source: string; productId?: string; sessionId?: string; metadata?: Record<string, unknown> }) {
   const user = await getSessionUser().catch(() => null);
