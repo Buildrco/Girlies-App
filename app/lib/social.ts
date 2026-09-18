@@ -1090,7 +1090,7 @@ export async function getSellerStudioSeries(storeId: string, days = 30): Promise
   const end = new Date();
   const start = new Date(end.getTime() - days * 86400000);
   const { data, error } = await supabase.rpc('get_seller_studio_series', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
-  if (error) throw new Error(`Could not load seller chart: ${errorMessage(error, 'Supabase rejected the request')}`);
+  if (error) { console.warn('Seller chart series unavailable:', error.message); return []; }
   return Array.isArray(data) ? data as SellerStudioSeriesPoint[] : [];
 }
 export async function requestSellerPayout(storeId: string, amount: number) {
