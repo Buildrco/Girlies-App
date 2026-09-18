@@ -9,12 +9,10 @@ import { useChromeVisibility } from '../components/BottomNav';
 import { SectionTitle } from '../components/SectionTitle';
 import { getProducts, type ProductRecord } from '../lib/social';
 import { MARKETPLACE_CATEGORIES } from '../constants/categories';
-import { useCart } from '../lib/cart';
 
 export default function Shop() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
-  const { count } = useCart();
   const { width } = useWindowDimensions();
   const heroWidth = Math.max(1, width - 36);
   const heroGap = 12;
@@ -44,10 +42,6 @@ export default function Shop() {
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.top}>
         <View><Text style={s.k}>SHOP</Text><Text style={s.h}>Find your next thing.</Text></View>
-         <Pressable style={s.cartCircle} onPress={() => router.push('/cart')}>
-           <I name="cart" size={19} color="#FFF" filled />
-          {count > 0 && <View style={s.count}><Text style={s.countText}>{count > 99 ? '99+' : count}</Text></View>}
-        </Pressable>
       </View>
 
       <ScrollView
@@ -106,9 +100,6 @@ const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   k: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3, color: C.muted },
   h: { fontSize: 27, fontWeight: '900', marginTop: 4 },
-  cartCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
-  count: { position: 'absolute', right: -3, top: -4, minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: 10, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.bg },
-  countText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
   heroRail: { marginTop: 17 },
   hero: { height: 220, borderRadius: 34, overflow: 'hidden', position: 'relative', backgroundColor: C.rose, marginRight: 0 },
   heroImg: { position: 'absolute', right: -10, bottom: 0, width: '65%', height: '100%', resizeMode: 'cover' },
