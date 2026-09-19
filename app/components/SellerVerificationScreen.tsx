@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
-import { Check, Info } from "lucide-react";
 import { C } from "../constants/theme";
+import { I } from "./Icons";
 
 type Feature = { text: string; hasInfo?: boolean };
 type Plan = {
@@ -98,7 +98,7 @@ export default function SellerVerificationScreen() {
             >
               <View style={s.planTop}>
                 <View style={s.planInfo}>
-                  <View style={[s.radio, selected && s.radioSelected]}>{selected && <Check size={11} color="#FFF" strokeWidth={3.5} />}</View>
+                  <View style={[s.radio, selected && s.radioSelected]}>{selected && <I name="check" size={11} color="#FFF" />}</View>
                   <View style={s.planCopy}>
                     <View style={s.nameRow}>
                       <Text style={s.planName}>{plan.name}</Text>
@@ -117,9 +117,9 @@ export default function SellerVerificationScreen() {
                   {plan.featuresLabel && <Text style={s.featuresLabel}>{plan.featuresLabel}</Text>}
                   {plan.features.map((feature) => (
                     <View key={feature.text} style={s.featureRow}>
-                      <Check size={14} color={C.pink} strokeWidth={3} />
+                      <I name="check" size={14} color={C.pink} />
                       <Text style={s.featureText}>{feature.text}</Text>
-                      {feature.hasInfo && <Info size={13} color="#D4D0D2" />}
+                      {feature.hasInfo && <I name="spark" size={13} color="#D4D0D2" />}
                     </View>
                   ))}
                 </View>
