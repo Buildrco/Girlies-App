@@ -7,7 +7,7 @@ import { I } from '../../components/Icons';
 import { Avatar, VerifiedMark } from '../../Avatar';
 import { ProductCard } from '../../components/ProductCard';
 import { LikeButton } from '../../components/LikeButton';
-import { addComment, addShare, deletePost, getProducts, getSessionUser, getStore, recordSellerEvent, reportPost, setFollow, setPostLike, setPostPreference } from '../../lib/social';
+import { addComment, addShare, deletePost, getProducts, getSellerAnnouncements, getSessionUser, getStore, recordSellerEvent, reportPost, setFollow, setPostLike, setPostPreference } from '../../lib/social';
 import { supabase } from '../../lib/supabase';
 import { MARKETPLACE_CATEGORIES } from '../../constants/categories';
 
@@ -46,6 +46,7 @@ export default function Seller() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const lastTap = useRef<Record<string, number>>({});
   const lastViewerTap = useRef(0);
   const viewerTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -58,12 +59,14 @@ export default function Seller() {
         if (!storeId) throw new Error('Seller could not be loaded.');
         const st = await getStore(storeId);
         if (!st) throw new Error('Seller not found.');
-        const [ps, me, postsResult] = await Promise.all([
+        const [ps, me, postsResult, announcementRows] = await Promise.all([
           getProducts(50, { storeId: st.id }),
           getSessionUser(),
           supabase.from('posts').select('id,author_id,body,media_urls,metadata,created_at').eq('author_id', st.owner_id).eq('visibility', 'public').order('created_at', { ascending: false }).limit(30),
+          getSellerAnnouncements(st.id),
         ]);
         if (postsResult.error) throw postsResult.error;
+        if (active) setAnnouncements(announcementRows);
         if (me?.id !== st.owner_id) void recordSellerEvent({ storeId: st.id, eventType: 'view', source: 'Seller storefront' });
         const posts = postsResult.data || [];
         const postIds = posts.map((post: any) => post.id);
@@ -254,6 +257,7 @@ export default function Seller() {
             <Pressable style={s.message} onPress={() => router.push('/chat')}><Text style={s.messageText}>Message</Text></Pressable>
           </View>
         </View>
+        {announcements.length > 0 && <View style={s.announcementWrap}><Text style={s.sectionTitle}>Shop announcements</Text>{announcements.map(item => <View key={item.id} style={s.announcementCard}><Text style={s.announcementTitle}>{item.title}</Text><Text style={s.announcementBody}>{item.body}</Text><Text style={s.sectionMeta}>{new Date(item.created_at).toLocaleDateString()}</Text></View>)}</View>}
         <View style={s.sectionHeader}>
           <View><Text style={s.sectionTitle}>Shop by category</Text><Text style={s.sectionMeta}>Only what this seller carries</Text></View>
         </View>
@@ -342,6 +346,10 @@ const s = StyleSheet.create({
   handle: { fontSize: 12, color: C.muted, marginTop: 2 },
   meta: { fontSize: 11, color: C.muted, marginTop: 3 },
   bio: { fontSize: 12, lineHeight: 18, fontWeight: '600', marginTop: 10 },
+  announcementWrap: { marginTop: 22, gap: 8 },
+  announcementCard: { backgroundColor: '#FFF', borderRadius: 18, padding: 14, gap: 5 },
+  announcementTitle: { fontSize: 14, fontWeight: '900' },
+  announcementBody: { fontSize: 12, lineHeight: 18, color: C.muted },
   actions: { flexDirection: 'row', gap: 8, marginTop: 13 },
   follow: { flex: 1, height: 42, borderRadius: 21, backgroundColor: C.cream, alignItems: 'center', justifyContent: 'center' },
   message: { flex: 1, height: 42, borderRadius: 21, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
