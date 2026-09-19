@@ -1,33 +1,174 @@
-import React from "react";
-import { StyleSheet, View } from "react-native";
-import { WebView } from "react-native-webview";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
+import { C } from "../constants/theme";
+import { I } from "./Icons";
 
-const verificationHtml = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>
-*{box-sizing:border-box}html,body{margin:0;background:transparent;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171318}body{padding:0 0 8px}.card{width:100%;border-radius:24px;background:#F5F3F4;padding:7px}.header{display:flex;justify-content:space-between;align-items:center;padding:13px 9px}.title{font-size:17px;font-weight:500;letter-spacing:-.5px}.billing-toggle{position:relative;display:flex;background:#E5E1E3;border-radius:18px;padding:3px}.billing-indicator{position:absolute;left:3px;top:3px;width:72px;height:29px;border-radius:15px;background:#FFF;transition:transform .35s cubic-bezier(.34,1.56,.64,1)}.billing-button{position:relative;z-index:1;width:72px;padding:7px 0;border:0;background:transparent;border-radius:15px;font-size:8px;font-weight:900;letter-spacing:1px;color:#999}.billing-button.active{color:#F64D86}.plan-list{display:flex;flex-direction:column;gap:6px}.plan{border-radius:18px;background:#FFF;padding:14px;border:1px solid #E5E1E3;transition:border-color .25s,box-shadow .25s}.plan.selected{border-color:#F64D86;box-shadow:0 2px 10px rgba(246,77,134,.12)}.plan-top{display:flex;justify-content:space-between;gap:8px}.plan-info{display:flex;flex:1;gap:10px}.radio{width:19px;height:19px;flex:none;border-radius:50%;border:1.5px solid #CCC;display:flex;align-items:center;justify-content:center;transition:background .25s,border-color .25s}.radio.selected{border-color:#F64D86;background:#F64D86;color:#FFF}.radio.selected:after{content:"✓";font-size:11px;font-weight:900}.plan-copy{flex:1}.name-row{display:flex;align-items:center;gap:7px}.plan-name{font-size:15px;font-weight:500}.badge{font-size:8px;font-weight:900;color:#F64D86;background:#FFF0F6;padding:3px 7px;border-radius:9px;text-transform:uppercase}.description{font-size:10px;color:#999;line-height:15px;margin-top:5px}.price{text-align:right}.price-text{font-size:15px;font-weight:500}.per-user{font-size:8px;font-weight:900;letter-spacing:1px;color:#AAA;margin-top:4px}.features{border-top:1px solid #EEE;margin-top:13px;padding-top:13px;display:flex;flex-direction:column;gap:8px;animation:reveal .3s ease}.features-label{font-size:9px;font-weight:900;letter-spacing:1px;color:#AAA;text-transform:uppercase;margin-bottom:2px}.feature-row{display:flex;align-items:center;gap:8px}.feature-check{color:#F64D86;font-size:14px;font-weight:900}.feature-text{font-size:11px;color:#666;flex:1}.footer{display:flex;flex-direction:column;align-items:center;gap:10px;padding:15px 9px}.footer-text{font-size:9px;color:#AAA;text-align:center}.continue{min-height:42px;padding:0 28px;border:0;border-radius:22px;background:#F64D86;color:#FFF;font-size:13px;font-weight:500}.hidden{display:none}@keyframes reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-</style></head><body><div class="card"><div class="header"><div class="title">Select a plan</div><div class="billing-toggle"><div id="billing-indicator" class="billing-indicator"></div><button class="billing-button active" data-cycle="monthly">MONTHLY</button><button class="billing-button" data-cycle="yearly">YEARLY</button></div></div><div class="plan-list">
-<div class="plan selected" data-plan="verified"><div class="plan-top"><div class="plan-info"><div class="radio selected"></div><div class="plan-copy"><div class="name-row"><div class="plan-name">Verified</div><div class="badge">Popular</div></div><div class="description">Build trust with a verified seller profile.</div></div></div><div class="price"><div class="price-text" data-monthly="GH₵ 49" data-yearly="GH₵ 39">GH₵ 49</div><div class="per-user">PER USER / MONTH</div></div></div><div class="features"><div class="features-label">Includes</div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Verification badge on your seller profile</span></div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Priority discovery in marketplace search</span></div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Seller profile trust insights</span></div></div></div>
-<div class="plan" data-plan="verified-plus"><div class="plan-top"><div class="plan-info"><div class="radio"></div><div class="plan-copy"><div class="name-row"><div class="plan-name">Verified Plus</div><div class="badge">Best value</div></div><div class="description">More visibility and tools for growing sellers.</div></div></div><div class="price"><div class="price-text" data-monthly="GH₵ 99" data-yearly="GH₵ 79">GH₵ 99</div><div class="per-user">PER USER / MONTH</div></div></div><div class="features hidden"><div class="features-label">Everything in Verified, plus</div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Featured placement opportunities</span></div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Advanced audience insights</span></div><div class="feature-row"><span class="feature-check">✓</span><span class="feature-text">Priority seller support</span></div></div></div>
-</div><div class="footer"><div class="footer-text">Cancel anytime. No long-term contract.</div><button class="continue">Continue</button></div></div><script>
-const indicator=document.getElementById("billing-indicator");const cycles=[...document.querySelectorAll("[data-cycle]")];const prices=[...document.querySelectorAll(".price-text")];cycles.forEach((button,index)=>button.addEventListener("click",()=>{indicator.style.transform="translateX("+index*72+"px)";cycles.forEach(item=>item.classList.toggle("active",item===button));prices.forEach(price=>price.textContent=price.dataset[index?"yearly":"monthly"])}));document.querySelectorAll(".plan").forEach(plan=>plan.addEventListener("click",()=>{document.querySelectorAll(".plan").forEach(item=>{const selected=item===plan;item.classList.toggle("selected",selected);item.querySelector(".radio").classList.toggle("selected",selected);item.querySelector(".features").classList.toggle("hidden",!selected)})}));
-</script></body></html>`;
+type Feature = { text: string; hasInfo?: boolean };
+type Plan = {
+  id: string;
+  name: string;
+  description: string;
+  priceMonthly: string;
+  priceYearly: string;
+  badge?: string;
+  featuresLabel?: string;
+  features: Feature[];
+};
+
+const plans: Plan[] = [
+  {
+    id: "verified",
+    name: "Verified",
+    description: "Build trust with a verified seller profile.",
+    priceMonthly: "GH₵ 49",
+    priceYearly: "GH₵ 39",
+    badge: "Popular",
+    featuresLabel: "Includes",
+    features: [
+      { text: "Verification badge on your seller profile" },
+      { text: "Priority discovery in marketplace search" },
+      { text: "Seller profile trust insights" },
+    ],
+  },
+  {
+    id: "verified-plus",
+    name: "Verified Plus",
+    description: "More visibility and tools for growing sellers.",
+    priceMonthly: "GH₵ 99",
+    priceYearly: "GH₵ 79",
+    badge: "Best value",
+    featuresLabel: "Everything in Verified, plus",
+    features: [
+      { text: "Featured placement opportunities" },
+      { text: "Advanced audience insights" },
+      { text: "Priority seller support" },
+    ],
+  },
+];
 
 export default function SellerVerificationScreen() {
+  const [selectedPlan, setSelectedPlan] = useState("verified");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const billingProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(billingProgress, {
+      toValue: billingCycle === "monthly" ? 0 : 1,
+      useNativeDriver: true,
+      bounciness: 8,
+      speed: 16,
+    }).start();
+  }, [billingCycle, billingProgress]);
+
   return (
-    <View style={s.wrap}>
-      <WebView
-        originWhitelist={["*"]}
-        source={{ html: verificationHtml }}
-        javaScriptEnabled
-        scrollEnabled={false}
-        showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}
-        style={s.webView}
-      />
+    <View style={s.card}>
+      <View style={s.header}>
+        <Text style={s.title}>Select a plan</Text>
+        <View style={s.billingToggle}>
+          <Animated.View
+            pointerEvents="none"
+            style={[s.billingIndicator, { transform: [{ translateX: billingProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 72] }) }] }]}
+          />
+          {(["monthly", "yearly"] as const).map((cycle) => (
+            <Pressable
+              key={cycle}
+              style={s.billingButton}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setBillingCycle(cycle);
+              }}
+            >
+              <Text style={[s.billingText, billingCycle === cycle && s.billingTextOn]}>{cycle.toUpperCase()}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={s.planList}>
+        {plans.map((plan) => {
+          const selected = selectedPlan === plan.id;
+          return (
+            <Pressable
+              key={plan.id}
+              style={[s.plan, selected && s.planSelected]}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setSelectedPlan(plan.id);
+              }}
+            >
+              <View style={s.planTop}>
+                <View style={s.planInfo}>
+                  <View style={[s.radio, selected && s.radioSelected]}>{selected && <I name="check" size={11} color="#FFF" />}</View>
+                  <View style={s.planCopy}>
+                    <View style={s.nameRow}>
+                      <Text style={s.planName}>{plan.name}</Text>
+                      {plan.badge && <Text style={s.badge}>{plan.badge}</Text>}
+                    </View>
+                    <Text style={s.description}>{plan.description}</Text>
+                  </View>
+                </View>
+                <View style={s.price}>
+                  <Text style={s.priceText}>{billingCycle === "monthly" ? plan.priceMonthly : plan.priceYearly}</Text>
+                  <Text style={s.perUser}>PER USER / MONTH</Text>
+                </View>
+              </View>
+              {selected && (
+                <View style={s.features}>
+                  {plan.featuresLabel && <Text style={s.featuresLabel}>{plan.featuresLabel}</Text>}
+                  {plan.features.map((feature) => (
+                    <View key={feature.text} style={s.featureRow}>
+                      <I name="check" size={14} color={C.pink} />
+                      <Text style={s.featureText}>{feature.text}</Text>
+                      {feature.hasInfo && <I name="spark" size={13} color="#D4D0D2" />}
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={s.footer}>
+        <Text style={s.footerText}>Cancel anytime. No long-term contract.</Text>
+        <Pressable style={s.continueButton} onPress={() => undefined}>
+          <Text style={s.continueText}>Continue</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { width: "100%" },
-  webView: { width: "100%", height: 490, backgroundColor: "transparent" },
+  card: { width: "100%", borderRadius: 24, backgroundColor: "#F5F3F4", padding: 7 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 9, paddingVertical: 13 },
+  title: { fontSize: 17, fontWeight: "500", color: C.ink, letterSpacing: -0.5 },
+  billingToggle: { flexDirection: "row", backgroundColor: "#E5E1E3", borderRadius: 18, padding: 3 },
+  billingIndicator: { position: "absolute", left: 3, top: 3, width: 72, height: 29, borderRadius: 15, backgroundColor: "#FFF" },
+  billingButton: { width: 72, paddingVertical: 7, borderRadius: 15, alignItems: "center", zIndex: 1 },
+  billingText: { fontSize: 8, fontWeight: "900", letterSpacing: 1, color: "#999" },
+  billingTextOn: { color: C.pink },
+  planList: { gap: 6 },
+  plan: { borderRadius: 18, backgroundColor: "#FFF", padding: 14, borderWidth: 1, borderColor: "#E5E1E3" },
+  planSelected: { borderColor: C.pink, shadowColor: C.pink, shadowOpacity: 0.12, shadowRadius: 10, elevation: 2 },
+  planTop: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  planInfo: { flex: 1, flexDirection: "row", gap: 10 },
+  radio: { width: 19, height: 19, borderRadius: 10, borderWidth: 1.5, borderColor: "#CCC", alignItems: "center", justifyContent: "center" },
+  radioSelected: { borderColor: C.pink, backgroundColor: C.pink },
+  planCopy: { flex: 1 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  planName: { fontSize: 15, fontWeight: "500", color: C.ink },
+  badge: { fontSize: 8, fontWeight: "900", color: C.pink, backgroundColor: "#FFF0F6", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9, textTransform: "uppercase" },
+  description: { fontSize: 10, color: C.muted, lineHeight: 15, marginTop: 5 },
+  price: { alignItems: "flex-end" },
+  priceText: { fontSize: 15, fontWeight: "500", color: C.ink },
+  perUser: { fontSize: 8, fontWeight: "900", letterSpacing: 1, color: "#AAA", marginTop: 4 },
+  features: { borderTopWidth: 1, borderTopColor: "#EEE", marginTop: 13, paddingTop: 13, gap: 8 },
+  featuresLabel: { fontSize: 9, fontWeight: "900", letterSpacing: 1, color: "#AAA", textTransform: "uppercase", marginBottom: 2 },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  featureText: { fontSize: 11, color: "#666", flex: 1 },
+  footer: { alignItems: "center", gap: 10, paddingHorizontal: 9, paddingVertical: 15 },
+  footerText: { fontSize: 9, color: "#AAA", textAlign: "center" },
+  continueButton: { minHeight: 42, paddingHorizontal: 28, borderRadius: 22, backgroundColor: C.pink, alignItems: "center", justifyContent: "center" },
+  continueText: { color: "#FFF", fontSize: 13, fontWeight: "500" },
 });
