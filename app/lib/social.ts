@@ -1077,6 +1077,7 @@ export async function sendMessage(conversationId: string, body: string) {
 
 export type SellerStudioTransaction = { id: string; amount: number; status: string; fulfillment_status: string; created_at: string };
 export type SellerStudioVisitor = { user_id: string; display_name: string; handle?: string | null; avatar_url?: string | null; last_seen: string; visits: number };
+export type SellerStudioCustomer = { customer_id: string; display_name: string; handle?: string | null; avatar_url?: string | null; product_id?: string | null; product_name?: string | null; product_image?: string | null; quantity: number; purchased_at: string };
 export type SellerStudioMetrics = { products: number; services: number; orders: number; paid_orders: number; gross_revenue: number; pending_revenue: number; visitors: number; views: number; engagement: number; clicks: number; carts: number; checkouts: number; purchases: number; customers: number; favourites: number; withdrawn: number; transactions: SellerStudioTransaction[] };
 export type SellerStudioSeriesPoint = { date: string; revenue: number; orders: number; visitors: number; views: number; purchases: number };
 const EMPTY_SELLER_METRICS: SellerStudioMetrics = { products: 0, services: 0, orders: 0, paid_orders: 0, gross_revenue: 0, pending_revenue: 0, visitors: 0, views: 0, engagement: 0, clicks: 0, carts: 0, checkouts: 0, purchases: 0, customers: 0, favourites: 0, withdrawn: 0, transactions: [] };
@@ -1100,6 +1101,41 @@ export async function getSellerStudioVisitors(storeId: string, days = 30): Promi
   const { data, error } = await supabase.rpc('get_seller_studio_visitors', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
   if (error) throw new Error(`Could not load visitors: ${errorMessage(error, 'Supabase rejected the request')}`);
   return Array.isArray(data) ? data as SellerStudioVisitor[] : [];
+}
+export async function getSellerStudioCustomers(storeId: string): Promise<SellerStudioCustomer[]> {
+  const { data, error } = await supabase.rpc('get_seller_studio_customers', { p_store_id: storeId });
+  if (error) throw new Error(`Could not load customers: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return Array.isArray(data) ? data as SellerStudioCustomer[] : [];
+}
+export async function createSellerAnnouncement(storeId: string, title: string, body: string, publishToFeed: boolean) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to publish an announcement.');
+  const { data, error } = await supabase.from('seller_announcements').insert({ store_id: storeId, author_id: user.id, title: title.trim(), body: body.trim(), publish_to_feed: publishToFeed }).select().single();
+  if (error) throw new Error(`Could not publish announcement: ${errorMessage(error, 'Supabase rejected the announcement')}`);
+  if (publishToFeed) {
+    const post = await supabase.from('posts').insert({ author_id: user.id, body: title.trim() + '\n\n' + body.trim(), media_urls: [], visibility: 'public', metadata: { type: 'seller_announcement', store_id: storeId, announcement_id: data.id } });
+    if (post.error) throw new Error(`Announcement saved but feed post failed: ${errorMessage(post.error, 'Supabase rejected the post')}`);
+  }
+  return data;
+}
+export async function createSellerCampaign(storeId: string, name: string, message: string, audience: string) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to create a campaign.');
+  const { data, error } = await supabase.from('seller_campaigns').insert({ store_id: storeId, owner_id: user.id, name: name.trim(), message: message.trim(), audience }).select().single();
+  if (error) throw new Error(`Could not save campaign: ${errorMessage(error, 'Supabase rejected the campaign')}`);
+  return data;
+}
+export async function createSellerDiscount(storeId: string, title: string, code: string, percentOff: number) {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Please sign in to create a discount.');
+  const { data, error } = await supabase.from('seller_discounts').insert({ store_id: storeId, owner_id: user.id, title: title.trim(), code: code.trim() || null, percent_off: percentOff }).select().single();
+  if (error) throw new Error(`Could not save discount: ${errorMessage(error, 'Supabase rejected the discount')}`);
+  return data;
+}
+export async function getSellerAnnouncements(storeId: string) {
+  const { data, error } = await supabase.from('seller_announcements').select('id,title,body,created_at').eq('store_id', storeId).eq('published', true).order('created_at', { ascending: false }).limit(5);
+  if (error) throw new Error(`Could not load announcements: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return data || [];
 }
 export async function requestSellerPayout(storeId: string, amount: number) {
   const { data, error } = await supabase.rpc('request_seller_payout', { p_store_id: storeId, p_amount: amount });
