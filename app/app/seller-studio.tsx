@@ -14,7 +14,7 @@ const primarySections = [
   ['orders', 'Orders', 'Orders received by your shop', 'receipt'],
 ] as const;
 const secondarySections = [
-  ['referrals', 'Referrals', 'arrow'], ['campaigns', 'Campaigns', 'chart'], ['discounts', 'Discounts', 'gift'], ['announcements', 'Announcements', 'chat'],
+  ['referrals', 'Referrals', 'arrow'], ['campaigns', 'Campaigns', 'chart'], ['discounts', 'Discounts', 'gift'], ['announcements', 'Announcements', 'chat'], ['subscription', 'Verification', 'shield'],
 ] as const;
 
 export default function SellerStudio() {
