@@ -1078,6 +1078,7 @@ export async function sendMessage(conversationId: string, body: string) {
 export type SellerStudioTransaction = { id: string; amount: number; status: string; fulfillment_status: string; created_at: string };
 export type SellerStudioVisitor = { user_id: string; display_name: string; handle?: string | null; avatar_url?: string | null; last_seen: string; visits: number };
 export type SellerStudioCustomer = { customer_id: string; display_name: string; handle?: string | null; avatar_url?: string | null; product_id?: string | null; product_name?: string | null; product_image?: string | null; quantity: number; purchased_at: string };
+export type SellerStudioTrafficSource = { source: string; events: number };
 export type SellerStudioMetrics = { products: number; services: number; orders: number; paid_orders: number; gross_revenue: number; pending_revenue: number; visitors: number; views: number; engagement: number; clicks: number; carts: number; checkouts: number; purchases: number; customers: number; favourites: number; withdrawn: number; transactions: SellerStudioTransaction[] };
 export type SellerStudioSeriesPoint = { date: string; revenue: number; orders: number; visitors: number; views: number; purchases: number };
 const EMPTY_SELLER_METRICS: SellerStudioMetrics = { products: 0, services: 0, orders: 0, paid_orders: 0, gross_revenue: 0, pending_revenue: 0, visitors: 0, views: 0, engagement: 0, clicks: 0, carts: 0, checkouts: 0, purchases: 0, customers: 0, favourites: 0, withdrawn: 0, transactions: [] };
@@ -1101,6 +1102,13 @@ export async function getSellerStudioVisitors(storeId: string, days = 30): Promi
   const { data, error } = await supabase.rpc('get_seller_studio_visitors', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
   if (error) throw new Error(`Could not load visitors: ${errorMessage(error, 'Supabase rejected the request')}`);
   return Array.isArray(data) ? data as SellerStudioVisitor[] : [];
+}
+export async function getSellerStudioTrafficSources(storeId: string, days = 30): Promise<SellerStudioTrafficSource[]> {
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 86400000);
+  const { data, error } = await supabase.rpc('get_seller_studio_traffic_sources', { p_store_id: storeId, p_start: start.toISOString(), p_end: end.toISOString() });
+  if (error) throw new Error(`Could not load traffic sources: ${errorMessage(error, 'Supabase rejected the request')}`);
+  return Array.isArray(data) ? data as SellerStudioTrafficSource[] : [];
 }
 export async function getSellerStudioCustomers(storeId: string): Promise<SellerStudioCustomer[]> {
   const { data, error } = await supabase.rpc('get_seller_studio_customers', { p_store_id: storeId });
