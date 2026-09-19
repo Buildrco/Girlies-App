@@ -1,21 +1,151 @@
-import React, { useRef } from "react";
-import { StyleSheet, View } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import React, { useRef, useState } from "react";
+import { Alert, Animated, Easing, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
+import { C } from "../constants/theme";
+import { I } from "./Icons";
 
 type Transaction = { id: string; amount: number; status?: string; created_at: string; fulfillment_status?: string };
-type Props = { available: number; pendingBalance: number; lifetimeEarnings: number; withdrawals: number; transactions: Transaction[]; withdrawing: boolean; onConfirm: (amount: number) => Promise<void> };
+type Props = {
+  available: number;
+  pendingBalance: number;
+  lifetimeEarnings: number;
+  withdrawals: number;
+  transactions: Transaction[];
+  withdrawing: boolean;
+  onConfirm: (amount: number) => Promise<void>;
+};
+
 const money = (value: number) => "GH₵ " + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const balanceHtml = (payload: string) => String.raw\`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>
-*{box-sizing:border-box}html,body{margin:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171318}button{font:inherit;border:0}.shell{width:100%;max-width:420px;margin:0 auto;padding:4px}.carousel{display:flex;flex-direction:column;gap:12px}.expanded,.small-card{color:#fff;box-shadow:0 12px 30px rgba(23,19,24,.12)}.expanded{min-height:192px;border-radius:30px;padding:18px;display:flex;flex-direction:column;justify-content:space-between;animation:open .45s cubic-bezier(.2,.8,.2,1)}.expanded-top,.expanded-bottom,.card-top,.wallet-row,.wallet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.expanded-bottom{align-items:flex-end;margin-top:28px}.expanded-title{font-size:19px;font-weight:800}.expanded-value{font-size:17px;font-weight:700;opacity:.65;margin-top:3px}.pill{color:#fff;background:rgba(255,255,255,.16);border-radius:20px;padding:8px 14px;font-size:11px;font-weight:800}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;transition:all .5s}.grid.active{grid-template-columns:repeat(3,minmax(0,1fr))}.small-card{height:132px;border-radius:24px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;animation:rise .45s both}.grid.active .small-card{height:112px}.card-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.card-value{font-size:15px;font-weight:800;opacity:.65;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.grid.active .card-title{font-size:10px}.grid.active .card-value{font-size:11px}.more{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font-weight:900}.wallet{margin-top:14px;border:1px solid #ececec;border-radius:24px;background:#fff;overflow:hidden;animation:rise .45s both}.wallet-collapsed{min-height:78px;padding:10px;display:flex;align-items:center;gap:10px;cursor:pointer}.wallet-icon{width:48px;height:48px;border:1.5px solid #ececec;border-radius:15px;background:linear-gradient(#f4f4f4,#e2e3ea);display:flex;align-items:center;justify-content:center;color:#d1d0d7;font-size:24px}.wallet-copy{flex:1}.wallet-label{font-size:10px;color:#9c9ba2;font-weight:800;letter-spacing:1px}.wallet-balance{font-size:17px;font-weight:800;margin-top:2px}.withdraw{padding:10px 13px;border-radius:20px;background:#F64D86;color:#fff;font-size:11px;font-weight:800}.wallet-expanded{padding:13px}.wallet-header{align-items:center}.close{width:31px;height:31px;border-radius:50%;background:#f0eff8;color:#acab b7;font-size:22px}.divider{height:1px;background:#ececec;margin:13px 0}.label{font-size:12px;font-weight:800;color:#848488}.amount-row{display:flex;gap:7px;margin-top:8px}.amount{flex:1;min-height:39px;border-radius:12px;border:1px solid #ececec;background:#f6f5fa;font-size:11px;font-weight:800}.amount.on{border-color:#F64D86;background:#fff;color:#F64D86}.confirm{min-height:45px;width:100%;border-radius:23px;background:#F64D86;color:#fff;font-weight:800;margin-top:13px}.confirm:disabled{opacity:.6}.progress{height:45px;border-radius:23px;background:#f3a9c2;overflow:hidden}.fill{height:100%;width:0;background:#fff;transition:width 1.5s ease}.section{font-size:17px;font-weight:900;margin:22px 0 9px}.transaction{min-height:64px;border-radius:19px;background:#fff;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}.transaction-icon{width:36px;height:36px;border-radius:12px;background:#171318;color:#fff;display:flex;align-items:center;justify-content:center}.transaction-copy{flex:1}.transaction-title{font-size:13px;font-weight:900}.muted{font-size:11px;color:#9c9ba2;margin-top:4px}.status{font-size:11px;font-weight:800;color:#171318;text-transform:capitalize}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes open{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
-</style></head><body><div id="root"></div><script>const DATA=__PAYLOAD__;const root=document.getElementById("root");let active=null;let open=false;let selected=DATA.available;let busy=false;let done=false;const pink="#F64D86";const icons={wallet:"◈",receipt:"▤",chart:"↗",arrow:"↗"};function money(v){return "GH₵ "+Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}function esc(v){return String(v==null?"":v).replace(/[&<>\"]/g,"")}function render(){const cards=DATA.cards||[];const visible=active?cards.filter(function(c){return c.id!==active}):cards;let h='<div class="shell"><div class="carousel">';if(active){const c=cards.find(function(x){return x.id===active});h+='<div class="expanded" style="background:'+esc(c.color)+'"><div class="expanded-top"><div style="font-size:38px">'+icons[c.icon]+'</div><button class="pill" onclick="alert(\\\"'+esc(c.title)+': '+esc(c.value)+'\\\")">View</button></div><div class="expanded-bottom"><div><div class="expanded-title">'+esc(c.title)+'</div><div class="expanded-value">'+esc(c.value)+'</div></div><button class="pill" onclick="active=null;render()">Edit</button></div></div>'}h+='<div class="grid '+(active?"active":"")+'">';visible.forEach(function(c){h+='<button class="small-card" style="background:'+esc(c.color)+'" onclick="active=\\\"'+esc(c.id)+'\\\";render()"><div class="card-top"><span style="font-size:'+(active?20:28)+'px">'+icons[c.icon]+'</span><span class="more">•••</span></div><div><div class="card-title">'+esc(c.title)+'</div><div class="card-value">'+esc(c.value)+'</div></div></button>'});h+='</div></div><div class="wallet">';if(!open){h+='<div class="wallet-collapsed" onclick="open=true;selected=DATA.available;render()"><div class="wallet-icon">◈</div><div class="wallet-copy"><div class="wallet-label">Wallet</div><div class="wallet-balance">'+money(DATA.available)+'</div></div><div class="withdraw">Withdraw</div></div>'}else{h+='<div class="wallet-expanded"><div class="wallet-header"><div class="wallet-row"><div class="wallet-icon">◈</div><div class="wallet-copy"><div class="wallet-label">Wallet</div><div class="wallet-balance">'+money(DATA.available)+'</div></div></div><button class="close" onclick="open=false;done=false;render()">×</button></div><div class="divider"></div><div class="label">Amount</div><div class="amount-row">';(DATA.presets||[]).forEach(function(a){h+='<button class="amount '+(selected===a?"on":"")+'" onclick="selected='+a+';render()">'+money(a)+'</button>'});h+='</div>';if(busy){h+='<div class="progress"><div id="fill" class="fill"></div></div>'}else{h+='<button class="confirm" '+(done?"disabled":"")+' onclick="withdraw()">'+(done?"Done ✓":"Withdraw "+money(selected))+'</button>'}h+='</div>'}h+='</div><div class="section">Transactions</div>';if((DATA.transactions||[]).length){DATA.transactions.forEach(function(row){h+='<div class="transaction"><div class="transaction-icon">▤</div><div class="transaction-copy"><div class="transaction-title">'+money(row.amount)+'</div><div class="muted">'+esc(row.status||"")+" · "+new Date(row.created_at).toLocaleDateString()+"</div></div><div class="status">'+esc(String(row.fulfillment_status||"pending").replaceAll("_"," "))+'</div></div>'})}else{h+='<div class="transaction"><div class="muted">No order transactions have been recorded for this shop yet.</div></div>'}h+='</div>';root.innerHTML=h;if(busy){setTimeout(function(){const fill=document.getElementById("fill");if(fill)fill.style.width="100%"},30)}}function withdraw(){if(selected<=0||busy||done)return;busy=true;render();window.ReactNativeWebView&&window.ReactNativeWebView.postMessage("withdraw:"+selected)}window.__withdrawDone=function(){busy=false;done=true;render();setTimeout(function(){open=false;done=false;render()},1500)};render();</script></body></html>\`.replace("__PAYLOAD__", payload);
-
 export default function SellerBalancePayouts({ available, pendingBalance, lifetimeEarnings, withdrawals, transactions, withdrawing, onConfirm }: Props) {
-  const webView = useRef<WebView>(null);
-  const cards = [{ id: "available", title: "Available balance", value: money(available), icon: "wallet", color: "#F64D86" }, { id: "pending", title: "Pending balance", value: money(pendingBalance), icon: "receipt", color: "#7C486B" }, { id: "lifetime", title: "Lifetime earnings", value: money(lifetimeEarnings), icon: "chart", color: "#171318" }, { id: "withdrawals", title: "Withdrawals", value: money(withdrawals), icon: "arrow", color: "#B06B92" }];
+  const cards = [
+    { id: "available", title: "Available balance", value: money(available), icon: "wallet", color: C.pink },
+    { id: "pending", title: "Pending balance", value: money(pendingBalance), icon: "receipt", color: C.plum },
+    { id: "lifetime", title: "Lifetime earnings", value: money(lifetimeEarnings), icon: "chart", color: C.ink },
+    { id: "withdrawals", title: "Withdrawals", value: money(withdrawals), icon: "arrow", color: "#B06B92" },
+  ];
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const active = cards.find((card) => card.id === activeId);
+  const visible = active ? cards.filter((card) => card.id !== active.id) : cards;
   const presets = Array.from(new Set([available, Math.round(available * 0.5 * 100) / 100, Math.min(100, available)].filter((value) => value > 0))).slice(0, 3);
-  const payload = JSON.stringify({ cards, available, presets, transactions }).replace(/</g, "\\u003c");
-  const onMessage = async (event: WebViewMessageEvent) => { const message = event.nativeEvent.data; if (!message.startsWith("withdraw:")) return; await onConfirm(Number(message.slice(9))); webView.current?.injectJavaScript("window.__withdrawDone&&window.__withdrawDone();true;"); };
-  return <View style={s.wrap}><WebView ref={webView} originWhitelist={["*"]} source={{ html: balanceHtml(payload) }} javaScriptEnabled scrollEnabled={false} showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} onMessage={onMessage} style={s.webView} /></View>;
+  const [open, setOpen] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState(available);
+  const [done, setDone] = useState(false);
+  const progress = useRef(new Animated.Value(0)).current;
+
+  const close = () => {
+    setOpen(false);
+    setDone(false);
+    progress.setValue(0);
+  };
+
+  const confirm = async () => {
+    if (selectedAmount <= 0) return;
+    Animated.timing(progress, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }).start();
+    await onConfirm(selectedAmount);
+    setDone(true);
+    setTimeout(close, 1500);
+  };
+
+  return (
+    <>
+      <View style={s.carousel}>
+        {active && (
+          <View style={[s.expanded, { backgroundColor: active.color }]}>
+            <View style={s.expandedTop}>
+              <I name={active.icon} size={38} color="#FFF" filled />
+              <Pressable style={s.copyPill} onPress={() => Alert.alert(active.title, active.value)}><Text style={s.copyText}>View</Text></Pressable>
+            </View>
+            <View style={s.expandedBottom}>
+              <View><Text style={s.expandedTitle}>{active.title}</Text><Text style={s.expandedValue}>{active.value}</Text></View>
+              <Pressable style={s.editPill} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setActiveId(null); }}><Text style={s.editText}>Edit</Text></Pressable>
+            </View>
+          </View>
+        )}
+        <View style={[s.grid, active && s.gridActive]}>
+          {visible.map((card) => (
+            <Pressable key={card.id} style={[s.smallCard, { backgroundColor: card.color }]} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setActiveId(card.id); }}>
+              <View style={s.cardTop}><I name={card.icon} size={active ? 20 : 28} color="#FFF" filled /><View style={s.more}><Text style={s.moreText}>•••</Text></View></View>
+              <View><Text style={[s.cardTitle, active && s.cardTitleSmall]}>{card.title}</Text><Text style={[s.cardValue, active && s.cardValueSmall]}>{card.value}</Text></View>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {!open ? (
+        <Pressable style={s.walletDisclosure} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.spring); setOpen(true); setSelectedAmount(available); }}>
+          <View style={s.walletIcon}><I name="wallet" size={24} color="#D1D0D7" filled /></View>
+          <View style={{ flex: 1 }}><Text style={s.walletLabel}>Wallet</Text><Text style={s.walletBalance}>{money(available)}</Text></View>
+          <View style={s.withdrawButton}><Text style={s.withdrawButtonText}>Withdraw</Text></View>
+        </Pressable>
+      ) : (
+        <View style={s.walletExpanded}>
+          <View style={s.walletHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}><View style={s.walletIcon}><I name="wallet" size={22} color="#D1D0D7" filled /></View><View><Text style={s.walletLabel}>Wallet</Text><Text style={s.walletBalance}>{money(available)}</Text></View></View>
+            <Pressable style={s.closeButton} onPress={close}><Text style={s.closeText}>×</Text></Pressable>
+          </View>
+          <View style={s.divider} />
+          <Text style={s.amountLabel}>Amount</Text>
+          <View style={s.amountRow}>{presets.length ? presets.map((amount) => <Pressable key={amount} style={[s.amountChoice, selectedAmount === amount && s.amountChoiceOn]} onPress={() => setSelectedAmount(amount)}><Text style={[s.amountText, selectedAmount === amount && s.amountTextOn]}>{money(amount)}</Text></Pressable>) : <Text style={s.muted}>No available balance yet.</Text>}</View>
+          <Pressable style={[s.confirm, (withdrawing || done) && s.disabled]} onPress={confirm} disabled={withdrawing || done || selectedAmount <= 0}>
+            {done ? <Text style={s.actionText}>Done ✓</Text> : withdrawing ? <View style={s.progressTrack}><Animated.View style={[s.progressFill, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }) }]} /></View> : <><I name="arrow" size={18} color="#FFF" /><Text style={s.actionText}>Withdraw {money(selectedAmount)}</Text></>}
+          </Pressable>
+        </View>
+      )}
+
+      <Text style={s.section}>Transactions</Text>
+      {transactions.length ? transactions.map((row) => <View key={row.id} style={s.transaction}><View style={s.transactionIcon}><I name="receipt" size={17} color="#FFF" filled /></View><View style={{ flex: 1 }}><Text style={s.transactionTitle}>{money(row.amount)}</Text><Text style={s.muted}>{row.status} · {new Date(row.created_at).toLocaleDateString()}</Text></View><Text style={s.status}>{String(row.fulfillment_status || "pending").replaceAll("_", " ")}</Text></View>) : <View style={s.empty}><Text style={s.muted}>No order transactions have been recorded for this shop yet.</Text></View>}
+    </>
+  );
 }
-const s = StyleSheet.create({ wrap: { width: "100%" }, webView: { width: "100%", height: 760, backgroundColor: "transparent" } });
+
+const s = StyleSheet.create({
+  carousel: { gap: 10 },
+  expanded: { minHeight: 192, borderRadius: 30, padding: 18, justifyContent: "space-between" },
+  expandedTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  copyPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#FFFFFF22" },
+  copyText: { color: "#FFF", fontWeight: "900", fontSize: 11 },
+  expandedBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 28 },
+  expandedTitle: { fontSize: 19, fontWeight: "900", color: "#FFF" },
+  expandedValue: { fontSize: 17, fontWeight: "800", color: "#FFFFFFAA", marginTop: 3 },
+  editPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: "#FFFFFF55" },
+  editText: { fontSize: 11, fontWeight: "900", color: "#FFF" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  gridActive: { flexWrap: "nowrap" },
+  smallCard: { flex: 1, minWidth: "47%", height: 132, borderRadius: 24, padding: 14, justifyContent: "space-between" },
+  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  cardTitle: { fontSize: 13, fontWeight: "800", color: "#FFF" },
+  cardValue: { fontSize: 15, fontWeight: "900", color: "#FFFFFFAA", marginTop: 4 },
+  cardTitleSmall: { fontSize: 10 },
+  cardValueSmall: { fontSize: 11 },
+  more: { width: 26, height: 26, borderRadius: 13, backgroundColor: "#FFFFFF22", alignItems: "center", justifyContent: "center" },
+  moreText: { color: "#FFF", fontWeight: "900", fontSize: 12, letterSpacing: -1 },
+  walletDisclosure: { minHeight: 78, borderRadius: 24, borderWidth: 1, borderColor: "#ECECEC", backgroundColor: "#FFF", padding: 10, flexDirection: "row", alignItems: "center", gap: 10, marginTop: 13 },
+  walletExpanded: { borderRadius: 24, borderWidth: 1, borderColor: "#ECECEC", backgroundColor: "#FFF", padding: 13, marginTop: 13 },
+  walletHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  walletIcon: { width: 48, height: 48, borderRadius: 15, borderWidth: 1.5, borderColor: "#ECECEC", backgroundColor: "#F4F4F4", alignItems: "center", justifyContent: "center" },
+  walletLabel: { fontSize: 10, color: "#9C9BA2", fontWeight: "800", letterSpacing: 1 },
+  walletBalance: { fontSize: 17, fontWeight: "900", color: "#010103", marginTop: 2 },
+  withdrawButton: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 20, backgroundColor: "#262629" },
+  withdrawButtonText: { fontSize: 11, fontWeight: "900", color: "#FEFEFE" },
+  closeButton: { width: 31, height: 31, borderRadius: 16, backgroundColor: "#F0EFF8", alignItems: "center", justifyContent: "center" },
+  closeText: { fontSize: 22, color: "#ACABB7", lineHeight: 25 },
+  divider: { height: 1, backgroundColor: "#ECECEC", marginVertical: 13 },
+  amountLabel: { fontSize: 12, fontWeight: "900", color: "#848488" },
+  amountRow: { flexDirection: "row", gap: 7, marginTop: 8 },
+  amountChoice: { flex: 1, minHeight: 39, borderRadius: 12, borderWidth: 1, borderColor: "#ECECEC", alignItems: "center", justifyContent: "center", backgroundColor: "#F6F5FA" },
+  amountChoiceOn: { borderColor: "#010103", backgroundColor: "#FEFEFE" },
+  amountText: { fontSize: 11, fontWeight: "800", color: "#000" },
+  amountTextOn: { color: "#000" },
+  confirm: { minHeight: 45, borderRadius: 23, backgroundColor: "#262629", paddingHorizontal: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 13 },
+  progressTrack: { height: 45, flex: 1, borderRadius: 23, backgroundColor: "#AFAEB8", overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: "#FEFEFE" },
+  actionText: { color: "#FFF", fontWeight: "900" },
+  disabled: { opacity: 0.6 },
+  section: { fontSize: 17, fontWeight: "900", marginTop: 22, marginBottom: 9, color: C.ink },
+  transaction: { minHeight: 64, borderRadius: 19, backgroundColor: "#FFF", padding: 12, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 },
+  transactionIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" },
+  transactionTitle: { fontSize: 13, fontWeight: "900", color: C.ink },
+  status: { color: C.ink, fontSize: 11, fontWeight: "900", textTransform: "capitalize" },
+  muted: { fontSize: 11, color: C.muted, marginTop: 4 },
+  empty: { padding: 25, borderRadius: 22, backgroundColor: "#FFF", alignItems: "center" },
+});
