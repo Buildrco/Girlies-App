@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { StyleSheet } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { WebView } from "react-native-webview";
 
 type Props = { value: boolean; onValueChange: (value: boolean) => void; accessibilityLabel?: string };
 
-const TOGGLE_WIDTH = 76;
-const TOGGLE_HEIGHT = 37;
+const TOGGLE_WIDTH = 64;
+const TOGGLE_HEIGHT = 31;
 
 function createToggleHtml(initialValue: boolean) {
   const checked = initialValue ? " checked" : "";
@@ -17,7 +17,7 @@ function createToggleHtml(initialValue: boolean) {
     '<style>',
     'html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }',
     '.toggle-container {',
-    '  --active-color: #1868e3;',
+    '  --active-color: #F64D86;',
     '  --inactive-color: #d3d3d6;',
     '  position: relative;',
     '  width: 100%;',
@@ -88,33 +88,39 @@ export default function AppToggle({ value, onValueChange, accessibilityLabel }: 
     webViewRef.current?.injectJavaScript("(function(){var input=document.querySelector('.toggle-input');if(input)input.checked=" + (value ? "true" : "false") + ";})(); true;");
   }, [value]);
 
-  const handleMessage = (event: WebViewMessageEvent) => {
-    try {
-      const nextValue = JSON.parse(event.nativeEvent.data).checked;
-      if (typeof nextValue === "boolean") onValueChange(nextValue);
-    } catch {
-      // Ignore malformed WebView messages.
-    }
-  };
 
   return (
-    <WebView
-      ref={webViewRef}
-      source={{ html }}
-      onMessage={handleMessage}
+    <Pressable
+      onPress={() => onValueChange(!value)}
       accessibilityLabel={accessibilityLabel}
-      originWhitelist={["*"]}
-      javaScriptEnabled
-      scrollEnabled={false}
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
-      bounces={false}
-      style={s.toggle}
-    />
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={s.hitArea}
+    >
+      <WebView
+        ref={webViewRef}
+        source={{ html }}
+        pointerEvents="none"
+        originWhitelist={["*"]}
+        javaScriptEnabled
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        style={s.toggle}
+      />
+    </Pressable>
   );
 }
 
 const s = StyleSheet.create({
+  hitArea: {
+    width: 72,
+    height: 40,
+    marginLeft: "auto",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   toggle: {
     width: TOGGLE_WIDTH,
     height: TOGGLE_HEIGHT,
