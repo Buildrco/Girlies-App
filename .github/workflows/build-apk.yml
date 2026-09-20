@@ -6,8 +6,12 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
+    name: Build release APK
     runs-on: ubuntu-latest
 
     defaults:
@@ -15,29 +19,52 @@ jobs:
         working-directory: app
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Install app dependencies
+        run: |
+          npm config set registry https://registry.npmjs.org
+          npm ci --no-audit --no-fund
 
-      - name: Build APK
-        run: npx eas-cli@latest build --platform android --profile preview --non-interactive --wait
+      - name: Generate native Android project
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          CI: 1
+        run: npx expo prebuild --platform android --no-install
 
-      - name: Download APK
-        run: npx eas-cli@latest build:download --latest --platform android --profile preview --output girlies-preview.apk --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: app/android/**/*.gradle*
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build release APK with Gradle
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: girlies-preview-apk
-          path: app/girlies-preview.apk
+          name: girlies-release-apk
+          path: app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
