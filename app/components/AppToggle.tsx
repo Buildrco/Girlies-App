@@ -118,6 +118,7 @@ const s = StyleSheet.create({
     width: TOGGLE_WIDTH,
     height: TOGGLE_HEIGHT,
     marginLeft: "auto",
+    alignSelf: "center",
     backgroundColor: "transparent",
   },
 });
