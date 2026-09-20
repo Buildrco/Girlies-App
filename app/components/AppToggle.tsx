@@ -119,6 +119,7 @@ const s = StyleSheet.create({
     height: TOGGLE_HEIGHT,
     marginLeft: "auto",
     alignSelf: "center",
+    transform: [{ translateY: 10 }],
     backgroundColor: "transparent",
   },
 });
