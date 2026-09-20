@@ -60,8 +60,9 @@ jobs:
       - name: Build release APK with Gradle
         working-directory: app/android
         run: |
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\norg.gradle.workers.max=2\n' >> gradle.properties
           chmod +x gradlew
-          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+          ./gradlew :app:assembleRelease --no-daemon --no-parallel --max-workers=2 --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
