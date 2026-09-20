@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { StyleSheet } from "react-native";
-import { WebView } from "react-native-webview";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 
 type Props = { value: boolean; onValueChange: (value: boolean) => void; accessibilityLabel?: string };
 
@@ -20,9 +20,8 @@ function createToggleHtml(initialValue: boolean) {
     '  --active-color: #F64D86;',
     '  --inactive-color: #d3d3d6;',
     '  position: relative;',
-    '  width: 100%;',
-    '  height: 100%;',
     '  aspect-ratio: 292 / 142;',
+    '  height: 1.875em;',
     '}',
     '.toggle-input {',
     '  appearance: none;',
@@ -89,41 +88,36 @@ export default function AppToggle({ value, onValueChange, accessibilityLabel }: 
   }, [value]);
 
 
+  const handleMessage = (event: WebViewMessageEvent) => {
+    try {
+      const nextValue = JSON.parse(event.nativeEvent.data).checked;
+      if (typeof nextValue === "boolean") onValueChange(nextValue);
+    } catch {
+      // Ignore malformed WebView messages.
+    }
+  };
   return (
-    <Pressable
-      onPress={() => onValueChange(!value)}
+    <WebView
+      ref={webViewRef}
+      source={{ html }}
+      onMessage={handleMessage}
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      style={s.hitArea}
-    >
-      <WebView
-        ref={webViewRef}
-        source={{ html }}
-        pointerEvents="none"
-        originWhitelist={["*"]}
-        javaScriptEnabled
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        style={s.toggle}
-      />
-    </Pressable>
+      originWhitelist={["*"]}
+      javaScriptEnabled
+      scrollEnabled={false}
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+      style={s.toggle}
+    />
   );
 }
 
 const s = StyleSheet.create({
-  hitArea: {
-    width: 72,
-    height: 40,
-    marginLeft: "auto",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   toggle: {
     width: TOGGLE_WIDTH,
     height: TOGGLE_HEIGHT,
+    marginLeft: "auto",
     backgroundColor: "transparent",
   },
 });
