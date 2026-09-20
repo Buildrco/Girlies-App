@@ -1,9 +1,14 @@
 import React from 'react';
 import { Stack, usePathname } from 'expo-router';
+import { Platform, UIManager } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
 import { CartProvider } from '../lib/cart';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 
 function NavigationChrome() {
   const pathname = usePathname();
