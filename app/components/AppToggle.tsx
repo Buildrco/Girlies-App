@@ -4,8 +4,8 @@ import { WebView, WebViewMessageEvent } from "react-native-webview";
 
 type Props = { value: boolean; onValueChange: (value: boolean) => void; accessibilityLabel?: string };
 
-const TOGGLE_WIDTH = 82;
-const TOGGLE_HEIGHT = 40;
+const TOGGLE_WIDTH = 76;
+const TOGGLE_HEIGHT = 37;
 
 function createToggleHtml(initialValue: boolean) {
   const checked = initialValue ? " checked" : "";
@@ -20,8 +20,9 @@ function createToggleHtml(initialValue: boolean) {
     '  --active-color: #1868e3;',
     '  --inactive-color: #d3d3d6;',
     '  position: relative;',
+    '  width: 100%;',
+    '  height: 100%;',
     '  aspect-ratio: 292 / 142;',
-    '  height: 1.875em;',
     '}',
     '.toggle-input {',
     '  appearance: none;',
