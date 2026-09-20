@@ -1,12 +1,11 @@
 import React from 'react';
-import { C } from '../constants/theme';
 
 type Props = { value: boolean; onValueChange: (value: boolean) => void; accessibilityLabel?: string };
 
 /** The supplied Uiverse toggle, kept as HTML/SVG/CSS for the web build. */
 export default function AppToggle({ value, onValueChange, accessibilityLabel }: Props) {
   return (
-    <div className="toggle-container" style={{ ['--active-color' as string]: C.pink }}>
+    <div className="toggle-container" style={{ ['--active-color' as string]: '#1868e3', ['--inactive-color' as string]: '#d3d3d6' }}>
       <input
         type="checkbox"
         className="toggle-input"
@@ -29,7 +28,7 @@ export default function AppToggle({ value, onValueChange, accessibilityLabel }: 
         </filter>
       </svg>
       <style>{
-        '.toggle-container{--inactive-color:#d3d3d6;position:relative;aspect-ratio:292 / 142;height:1.875em}.toggle-input{appearance:none;margin:0;position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;cursor:pointer}.toggle{width:100%;height:100%;overflow:visible}.toggle-background{fill:var(--inactive-color);transition:fill .4s}.toggle-input:checked + .toggle .toggle-background{fill:var(--active-color)}.toggle-circle-center{transform-origin:center;transition:transform .6s}.toggle-input:checked + .toggle .toggle-circle-center{transform:translateX(150px)}.toggle-circle{transform-origin:center;transition:transform .45s;backface-visibility:hidden}.toggle-circle.left{transform:scale(1)}.toggle-input:checked + .toggle .toggle-circle.left{transform:scale(0)}.toggle-circle.right{transform:scale(0)}.toggle-input:checked + .toggle .toggle-circle.right{transform:scale(1)}.toggle-icon{transition:fill .4s}.toggle-icon.on{fill:var(--inactive-color)}.toggle-input:checked + .toggle .toggle-icon.on{fill:#fff}.toggle-icon.off{fill:#eaeaec}.toggle-input:checked + .toggle .toggle-icon.off{fill:var(--active-color)}'
+        '.toggle-container{--active-color:#1868e3;--inactive-color:#d3d3d6;position:relative;aspect-ratio:292 / 142;height:1.875em}.toggle-input{appearance:none;margin:0;position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;cursor:pointer}.toggle{width:100%;height:100%;overflow:visible}.toggle-background{fill:var(--inactive-color);transition:fill .4s}.toggle-input:checked + .toggle .toggle-background{fill:var(--active-color)}.toggle-circle-center{transform-origin:center;transition:transform .6s}.toggle-input:checked + .toggle .toggle-circle-center{transform:translateX(150px)}.toggle-circle{transform-origin:center;transition:transform .45s;backface-visibility:hidden}.toggle-circle.left{transform:scale(1)}.toggle-input:checked + .toggle .toggle-circle.left{transform:scale(0)}.toggle-circle.right{transform:scale(0)}.toggle-input:checked + .toggle .toggle-circle.right{transform:scale(1)}.toggle-icon{transition:fill .4s}.toggle-icon.on{fill:var(--inactive-color)}.toggle-input:checked + .toggle .toggle-icon.on{fill:#fff}.toggle-icon.off{fill:#eaeaec}.toggle-input:checked + .toggle .toggle-icon.off{fill:var(--active-color)}'
       }</style>
     </div>
   );
