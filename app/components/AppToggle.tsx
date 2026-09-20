@@ -1,19 +1,65 @@
-import React from "react";
-import { StyleSheet, View } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import React, { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet } from "react-native";
+import { C } from "../constants/theme";
 
 type Props = { value: boolean; onValueChange: (value: boolean) => void; accessibilityLabel?: string };
 
-const toggleHtml = (value: boolean, label?: string) => {
-  const checked = value ? " checked" : "";
-  const safeLabel = String(label || "Toggle").replace(/[&<>\"]/g, "");
-  return '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><style>' +
-    '*{box-sizing:border-box}html,body{margin:0;background:transparent;overflow:hidden}.toggle-container{--active-color:#F64D86;--inactive-color:#d3d3d6;position:relative;aspect-ratio:292 / 142;height:1.875em}.toggle-input{appearance:none;margin:0;position:absolute;z-index:1;inset:0;width:100%;height:100%;cursor:pointer}.toggle{width:100%;height:100%;overflow:visible}.toggle-background{fill:var(--inactive-color);transition:fill .4s}.toggle-input:checked + .toggle .toggle-background{fill:var(--active-color)}.toggle-circle-center{transform-origin:center;transition:transform .6s}.toggle-input:checked + .toggle .toggle-circle-center{transform:translateX(150px)}.toggle-circle{transform-origin:center;transition:transform .45s;backface-visibility:hidden}.toggle-circle.left{transform:scale(1)}.toggle-input:checked + .toggle .toggle-circle.left{transform:scale(0)}.toggle-circle.right{transform:scale(0)}.toggle-input:checked + .toggle .toggle-circle.right{transform:scale(1)}.toggle-icon{transition:fill .4s}.toggle-icon.on{fill:var(--inactive-color)}.toggle-input:checked + .toggle .toggle-icon.on{fill:#fff}.toggle-icon.off{fill:#eaeaec}.toggle-input:checked + .toggle .toggle-icon.off{fill:var(--active-color)}' +
-    '</style></head><body><div class="toggle-container"><input id="toggle" class="toggle-input" type="checkbox" aria-label="' + safeLabel + '"' + checked + '><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 142" class="toggle"><path d="M71 142C31.7878 142 0 110.212 0 71C0 31.7878 31.7878 0 71 0C110.212 0 119 30 146 30C173 30 182 0 221 0C260 0 292 31.7878 292 71C292 110.212 260.212 142 221 142C181.788 142 173 112 146 112C119 112 110.212 142 71 142Z" class="toggle-background"></path><rect rx="6" height="64" width="12" y="39" x="64" class="toggle-icon on"></rect><path d="M221 91C232.046 91 241 82.0457 241 71C241 59.9543 232.046 51 221 51C209.954 51 201 59.9543 201 71C201 82.0457 209.954 91 221 91ZM221 103C238.673 103 253 88.6731 253 71C253 53.3269 238.673 39 221 39C203.327 39 189 53.3269 189 71C189 88.6731 203.327 103 221 103Z" fill-rule="evenodd" class="toggle-icon off"></path><g filter="url(#goo)"><rect fill="#fff" rx="29" height="58" width="116" y="42" x="13" class="toggle-circle-center"></rect><rect fill="#fff" rx="58" height="114" width="114" y="14" x="14" class="toggle-circle left"></rect><rect fill="#fff" rx="58" height="114" width="114" y="14" x="164" class="toggle-circle right"></rect></g><filter id="goo"><feGaussianBlur stdDeviation="10" result="blur"></feGaussianBlur><feColorMatrix result="goo" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" mode="matrix" in="blur"></feColorMatrix></filter></svg></div><script>document.getElementById("toggle").addEventListener("change",function(){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(this.checked?"true":"false")});</script></body></html>';
-};
-
+/**
+ * Native version of the settings toggle.
+ *
+ * The previous implementation rendered an HTML/SVG toggle in a WebView. That
+ * made the control scale inconsistently on Android and meant every toggle had
+ * a separate web runtime. Keeping the animation here gives the APK the same
+ * springy behavior as the subscription screen without relying on a network
+ * request or a WebView.
+ */
 export default function AppToggle({ value, onValueChange, accessibilityLabel }: Props) {
-  return <View style={s.wrap}><WebView originWhitelist={["*"]} source={{ html: toggleHtml(value, accessibilityLabel) }} javaScriptEnabled scrollEnabled={false} showsVerticalScrollIndicator={false} showsHorizontalScrollIndicator={false} onMessage={(event: WebViewMessageEvent) => onValueChange(event.nativeEvent.data === "true")} style={s.webView} /></View>;
+  const progress = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: value ? 1 : 0,
+      useNativeDriver: false,
+      bounciness: 8,
+      speed: 18,
+    }).start();
+  }, [progress, value]);
+
+  const trackColor = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#D3D3D6", C.pink],
+  });
+  const thumbScale = progress.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 0.84, 1],
+  });
+  const offIconOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const onIconOpacity = progress.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const thumbX = progress.interpolate({ inputRange: [0, 1], outputRange: [3, 45] });
+
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ checked: value }}
+      hitSlop={8}
+      onPress={() => onValueChange(!value)}
+      style={s.hitArea}
+    >
+      <Animated.View style={[s.track, { backgroundColor: trackColor }]}>
+        <Animated.View pointerEvents="none" style={[s.thumb, { transform: [{ translateX: thumbX }, { scale: thumbScale }] }]}>
+          <Animated.View style={[s.offIcon, { opacity: offIconOpacity }]} />
+          <Animated.View style={[s.onIcon, { opacity: onIconOpacity }]} />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
 }
 
-const s = StyleSheet.create({ wrap: { width: 58, height: 31, justifyContent: "center" }, webView: { width: 58, height: 31, backgroundColor: "transparent" } });
+const s = StyleSheet.create({
+  hitArea: { width: 82, height: 44, alignItems: "flex-end", justifyContent: "center" },
+  track: { width: 82, height: 40, borderRadius: 21, overflow: "hidden", justifyContent: "center" },
+  thumb: { position: "absolute", left: 0, top: 3, width: 34, height: 34, borderRadius: 17, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center" },
+  offIcon: { width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: "#D3D3D6" },
+  onIcon: { position: "absolute", width: 4, height: 16, borderRadius: 2, backgroundColor: C.pink },
+});

@@ -1,23 +1,219 @@
-import React, { useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
+import React, { useState } from "react";
+import { Alert, LayoutAnimation, Pressable, StyleSheet, Text, View } from "react-native";
+import { C } from "../constants/theme";
+import { I } from "./Icons";
 
 type Transaction = { id: string; amount: number; status?: string; created_at: string; fulfillment_status?: string };
-type Props = { available: number; pendingBalance: number; lifetimeEarnings: number; withdrawals: number; transactions: Transaction[]; withdrawing: boolean; onConfirm: (amount: number) => Promise<void> };
+type Props = {
+  available: number;
+  pendingBalance: number;
+  lifetimeEarnings: number;
+  withdrawals: number;
+  transactions: Transaction[];
+  withdrawing: boolean;
+  onConfirm: (amount: number) => Promise<void>;
+};
+
 const money = (value: number) => "GH₵ " + Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const minimalCarouselSource = "import React, { useState } from \"react\";\nimport { motion, AnimatePresence } from \"motion/react\";\nimport { MoreHorizontal, Copy } from \"lucide-react\";\n\n/* --- Types --- */\nexport interface CarouselCard {\n  id: string;\n  title: string;\n  value: string;\n  color: string;\n  icon: React.ElementType;\n}\n\ninterface MinimalCarouselProps {\n  cards: CarouselCard[];\n  onCopyClick?: (card: CarouselCard) => void;\n  onCustomizeClick?: (card: CarouselCard) => void;\n}\n\nexport const MinimalCarousel: React.FC<MinimalCarouselProps> = ({\n  cards,\n  onCopyClick,\n  onCustomizeClick,\n}) => {\n  const [activeId, setActiveId] = useState<string | null>(null);\n\n  const activeCard = cards.find((c) => c.id === activeId);\n  const secondaryCards = cards.filter((c) => c.id !== activeId);\n\n  const handleBackgroundClick = (e: React.MouseEvent) => {\n    if (e.target === e.currentTarget) setActiveId(null);\n  };\n\n  return (\n    <div className=\"min-h-full w-full flex items-center justify-center bg-transparent\">\n      <div\n        className=\"w-full flex flex-col items-center justify-center px-3 sm:px-4 select-none font-sans\"\n        onClick={handleBackgroundClick}\n      >\n        {/* Container  */}\n        <div className=\"w-full max-w-105\">\n          <motion.div layout className=\"flex flex-col gap-3\">\n\n            {/* Expanded Card */}\n            <AnimatePresence mode=\"popLayout\">\n              {activeCard && (\n                <motion.div\n                  key={activeCard.id}\n                  layoutId={activeCard.id}\n                  className={`relative flex w-full flex-col justify-between\n                             rounded-[28px] sm:rounded-[32px] p-4 sm:p-5 text-white shadow-2xl\n                             ${activeCard.color}\n                             min-h-42.5 sm:h-48`}\n                  transition={{ type: \"spring\", bounce: 0.2, duration: 0.6 }}\n                >\n                  <div className=\"flex items-start justify-between gap-2\">\n                    <div className=\"flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full shrink-0\">\n                      <activeCard.icon size={38} className=\"sm:w-11 sm:h-11\" />\n                    </div>\n\n                    <motion.button\n                      initial={{ opacity: 0, scale: 0.8 }}\n                      animate={{ opacity: 1, scale: 1 }}\n                      type=\"button\"\n                      onClick={(e) => {\n                        e.stopPropagation();\n                        onCopyClick?.(activeCard);\n                      }}\n                      className=\"flex items-center gap-1.5 rounded-full bg-white/10\n                                 px-3 py-1.5 sm:px-4 sm:py-2 font-bold backdrop-blur-md \n                                 text-xs sm:text-base whitespace-nowrap\n                                 hover:bg-white/20 transition-colors\"\n                    >\n                      Copy <span className=\"hidden xs:inline\">Address</span> <Copy size={16} />\n                    </motion.button>\n                  </div>\n\n                  <div className=\"flex items-end justify-between mt-4\">\n                    <div className=\"overflow-hidden mr-2\">\n                      <h3 className=\"text-xl sm:text-2xl font-semibold opacity-90 leading-tight truncate\">\n                        {activeCard.title}\n                      </h3>\n                      <p className=\"text-lg sm:text-xl font-semibold tracking-tight opacity-60 truncate\">\n                        {activeCard.value}\n                      </p>\n                    </div>\n\n                    <button\n                      type=\"button\"\n                      onClick={(e) => {\n                        e.stopPropagation();\n                        onCustomizeClick?.(activeCard);\n                      }}\n                      className=\"rounded-full bg-white/30 px-3 py-1 sm:px-4 sm:py-1.5\n                                 text-sm sm:text-base font-bold backdrop-blur-md \n                                 hover:bg-white/40 transition-colors shrink-0\"\n                    >\n                      Edit\n                    </button>\n                  </div>\n                </motion.div>\n              )}\n            </AnimatePresence>\n\n            {/* Grid Layout */}\n            <motion.div\n              layout\n              className={`grid gap-2 sm:gap-3 transition-all duration-500 ${activeId ? \"grid-cols-3\" : \"grid-cols-2\"\n                }`}\n            >\n              {(activeId ? secondaryCards : cards).map((card) => (\n                <motion.div\n                  key={card.id}\n                  layoutId={card.id}\n                  onClick={(e) => {\n                    e.stopPropagation();\n                    setActiveId(card.id);\n                  }}\n                  transition={{ type: \"spring\", bounce: 0.2, duration: 0.6 }}\n                  className={`relative flex flex-col justify-between cursor-pointer\n                             rounded-[22px] sm:rounded-[28px] p-3 sm:p-4 text-white shadow-lg\n                             ${card.color}\n                             ${activeId ? \"h-24 sm:h-28\" : \"h-28 sm:h-32\"}`}\n                >\n                  <div className=\"flex justify-between items-start\">\n                    <card.icon size={activeId ? 20 : 28} className=\"shrink-0\" />\n                    <div className=\"rounded-full bg-white/10 p-1 sm:p-1.5 transition-colors\">\n                      <MoreHorizontal size={16} />\n                    </div>\n                  </div>\n\n                  <div className=\"mt-1 overflow-hidden\">\n                    <h4 className={`${activeId ? \"text-[10px] sm:text-xs\" : \"text-sm sm:text-base\"} \n                                   font-medium opacity-90 truncate leading-tight`}>\n                      {card.title}\n                    </h4>\n                    <p className={`${activeId ? \"text-[10px] sm:text-xs\" : \"text-sm sm:text-base\"} \n                                   font-semibold text-white/60 truncate`}>\n                      {card.value}\n                    </p>\n                  </div>\n                </motion.div>\n              ))}\n            </motion.div>\n          </motion.div>\n        </div>\n      </div>\n    </div>\n  );\n};";
-const addCashSource = "import React, { useState, useEffect } from 'react';\nimport { motion, AnimatePresence, MotionConfig } from 'motion/react';\nimport { Plus, X, Wallet, Check } from 'lucide-react';\nimport { MdOutlineAddCard } from 'react-icons/md';\n\nexport interface PaymentCard {\n  id: string;\n  last4: string;\n  brand: 'VISA' | 'MASTERCARD';\n  isDefault?: boolean;\n  hasToggle?: boolean;\n}\n\nexport interface CashDisclosureProps {\n  initialBalance: number;\n  cards: PaymentCard[];\n  presets: number[];\n  onConfirm: (amount: number) => Promise<void>;\n}\n\nexport const AddCashDisclosure: React.FC<CashDisclosureProps> = ({\n  initialBalance,\n  cards,\n  presets,\n  onConfirm,\n}) => {\n  const [isOpen, setIsOpen] = useState(false);\n  const [selectedCard, setSelectedCard] = useState<string>(cards[0]?.id || '');\n  const [selectedAmount, setSelectedAmount] = useState<number>(presets[1]);\n  const [isProcessing, setIsProcessing] = useState(false);\n  const [isDone, setIsDone] = useState(false);\n  const [displayBalance, setDisplayBalance] = useState(initialBalance);\n\n  useEffect(() => {\n    if (!isProcessing && !isDone) {\n      setTimeout(() => setDisplayBalance(initialBalance), 0);\n    }\n  }, [initialBalance, isProcessing, isDone]);\n\n  const handleOpen = () => setIsOpen(true);\n  const handleClose = () => {\n    setIsOpen(false);\n    setIsProcessing(false);\n    setIsDone(false);\n  };\n\n  const handleConfirm = async () => {\n    setIsProcessing(true);\n    await onConfirm(selectedAmount);\n    setIsDone(true);\n    setTimeout(() => handleClose(), 1500);\n  };\n\n  const formatCurrency = (val: number) => {\n    return new Intl.NumberFormat('en-US', {\n      style: 'currency',\n      currency: 'USD',\n    }).format(val);\n  };\n\n  return (\n    <div className=\"flex min-h-full w-full flex-col items-center justify-center bg-transparent p-2 transition-colors duration-500 sm:p-4\">\n      <MotionConfig transition={{ type: 'spring', bounce: 0, duration: 0.6 }}>\n        <AnimatePresence mode=\"popLayout\" initial={false}>\n          {!isOpen ? (\n            <motion.div\n              key=\"collapsed\"\n              layoutId=\"add-cash-disclosure\"\n              initial={{ opacity: 0 }}\n              animate={{ opacity: 1 }}\n              exit={{ opacity: 0 }}\n              transition={{\n                opacity: { duration: 0.3 },\n              }}\n              style={{\n                borderRadius: 24,\n              }}\n              className=\"flex w-xs sm:w-sm items-center justify-between gap-4 sm:gap-10 border border-[#ECECEC] bg-white p-3 dark:border-white/5 dark:bg-[#1C1C1E] overflow-hidden\"\n            >\n              <div className=\"flex items-center gap-2 sm:gap-3\">\n                <motion.div\n                  layoutId=\"wallet-icon\"\n                  className=\"flex h-10 w-10 items-center justify-center rounded-xl border-[1.5px] border-[#ECECEC] bg-linear-to-b from-[#F4F4F4] to-[#E2E3EA]/50 shadow-sm transition-colors sm:h-14 sm:w-14 dark:border-white/10 dark:from-[#2A2A2D] dark:to-[#1C1C1E]\"\n                >\n                  <Wallet\n                    className=\"h-5 w-5 text-[#D1D0D7] sm:h-8 sm:w-8 dark:text-[#4A4A4D]\"\n                    fill=\"currentColor\"\n                    strokeWidth={1.5}\n                  />\n                </motion.div>\n                <div className=\"flex flex-col\">\n                  <motion.span\n                    layoutId=\"wallet-name\"\n                    className=\"text-[10px] font-normal tracking-wider text-gray-400 capitalize sm:text-xs\"\n                  >\n                    Wallet\n                  </motion.span>\n                  <motion.span\n                    layoutId=\"wallet-balance\"\n                    className=\"font-sans text-base font-semibold text-[#010103] sm:text-xl dark:text-white\"\n                  >\n                    {formatCurrency(displayBalance)}\n                  </motion.span>\n                </div>\n              </div>\n              <motion.button\n                layoutId=\"add-cash-button\"\n                onClick={handleOpen}\n                className=\"flex items-center gap-1 rounded-full bg-[#262629] px-3 py-2 text-xs font-semibold text-[#fefefe] transition-colors hover:bg-[#3d3d42] sm:px-4 sm:text-sm dark:bg-white dark:text-black dark:hover:bg-gray-200\"\n              >\n                <Plus className=\"h-3 w-3 sm:h-4 sm:w-4\" strokeWidth={3} />\n                Add Cash\n              </motion.button>\n            </motion.div>\n          ) : (\n            <motion.div\n              key=\"expanded\"\n              layoutId=\"add-cash-disclosure\"\n              initial={{ opacity: 0 }}\n              animate={{ opacity: 1 }}\n              exit={{ opacity: 0 }}\n              transition={{\n                opacity: { duration: 0.3 },\n              }}\n              className=\"flex w-xs sm:w-sm flex-col border border-[#ECECEC] bg-white py-3 dark:border-white/5 dark:bg-[#1C1C1E] overflow-hidden\"\n              style={{\n                borderRadius: 24,\n              }}\n            >\n              <motion.div layout>\n                <div className=\"flex items-center justify-between gap-2 px-4\">\n                  <div className=\"flex items-center gap-2\">\n                    <motion.div\n                      layoutId=\"wallet-icon\"\n                      className=\"flex h-10 w-10 items-center justify-center rounded-xl border-[1.5px] border-[#ECECEC] bg-linear-to-b from-[#F4F4F4] to-[#E2E3EA]/50 shadow-sm sm:h-12 sm:w-12 dark:border-white/10 dark:from-[#2A2A2D] dark:to-[#1C1C1E]\"\n                    >\n                      <Wallet\n                        className=\"h-5 w-5 text-[#D1D0D7] sm:h-7 sm:w-7 dark:text-[#4A4A4D]\"\n                        fill=\"currentColor\"\n                        strokeWidth={1.5}\n                      />\n                    </motion.div>\n                    <div className=\"flex flex-col\">\n                      <motion.span\n                        layoutId=\"wallet-name\"\n                        className=\"text-[9px] font-medium text-[#9C9BA2] sm:text-[10px]\"\n                      >\n                        Wallet\n                      </motion.span>\n                      <motion.span\n                        layoutId=\"wallet-balance\"\n                        className=\"text-sm font-semibold text-[#010101] sm:text-base dark:text-white\"\n                      >\n                        {formatCurrency(displayBalance)}\n                      </motion.span>\n                    </div>\n                  </div>\n                  <button\n                    title=\"close\"\n                    onClick={handleClose}\n                    className=\"flex h-7 w-7 items-center justify-center rounded-full bg-[#F0EFF8] text-[#ACABB7] transition-colors hover:text-[#a09fab] sm:h-8 sm:w-8 dark:bg-white/10 dark:text-gray-400 dark:hover:text-white\"\n                  >\n                    <X className=\"h-4 w-4 sm:h-5 sm:w-5\" strokeWidth={3} />\n                  </button>\n                </div>\n\n                <div className=\"mt-4 h-px w-full bg-[#ECECEC] dark:bg-white/5\" />\n\n                <div className=\"mt-5 flex flex-col gap-2 px-4\">\n                  <div className=\"flex items-center justify-between\">\n                    <span className=\"text-xs font-medium text-[#848488] sm:text-sm\">\n                      Payment Mode\n                    </span>\n                    <button className=\"flex items-center gap-1 rounded-2xl border-[1.5px] border-[#E8E8EE] bg-gray-50 px-2.5 py-1 text-[10px] font-semibold text-[#000000] transition-colors hover:bg-gray-100 sm:text-xs dark:border-white/10 dark:bg-white/5 dark:text-white\">\n                      <MdOutlineAddCard className=\"h-3 w-3 sm:h-4 sm:w-4\" />\n                      Add Card\n                    </button>\n                  </div>\n\n                  <div className=\"space-y-2\">\n                    {cards.map((card) => {\n                      const isSelected = selectedCard === card.id;\n                      return (\n                        <div\n                          key={card.id}\n                          onClick={() => setSelectedCard(card.id)}\n                          className={`flex cursor-pointer items-center justify-between rounded-xl border-[1.5px] p-3 transition-all sm:p-4 ${isSelected\n                              ? 'border-[#010103] ring-1 ring-[#010103] dark:border-white dark:bg-white/5 dark:ring-white'\n                              : 'border-[#ECECEC] bg-[#F6F5FA] hover:border-gray-300 dark:border-white/5 dark:bg-white/2 dark:hover:border-white/20'\n                            }`}\n                        >\n                          <div className=\"flex items-center gap-2 sm:gap-3\">\n                            <div\n                              className={`flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors sm:h-5 sm:w-5 ${isSelected\n                                  ? 'border-[#010103] dark:border-white'\n                                  : 'border-[#ECECEC] dark:border-white/10'\n                                }`}\n                            >\n                              {isSelected && (\n                                <div className=\"h-2 w-2 rounded-full bg-[#010103] sm:h-2.5 sm:w-2.5 dark:bg-white\" />\n                              )}\n                            </div>\n                            <span className=\"text-xs font-medium text-gray-900 sm:text-sm dark:text-gray-200\">\n                              <span className=\"mr-1 tracking-tighter text-[#000000] dark:text-gray-500\">\n                                ••••\n                              </span>\n                              {card.last4}\n                            </span>\n                          </div>\n                          <span className=\"text-[9px] font-extrabold text-[#000000] italic sm:text-[10px] dark:text-gray-400\">\n                            {card.brand}\n                          </span>\n                        </div>\n                      );\n                    })}\n                  </div>\n                </div>\n                <div className=\"my-4 flex flex-col gap-2 px-4\">\n                  <span className=\"text-xs font-medium text-[#808083] sm:text-sm\">\n                    Amount\n                  </span>\n                  <div className=\"flex gap-2\">\n                    {presets.map((amount) => {\n                      const isSelected = selectedAmount === amount;\n                      return (\n                        <button\n                          key={amount}\n                          onClick={() => setSelectedAmount(amount)}\n                          className={`flex-1 rounded-lg border-[1.5px] py-2 text-[11px] font-semibold transition-all sm:text-sm ${isSelected\n                              ? 'border-[#000000] bg-[#fefefe] text-[#000000] ring-1 ring-[#000000] dark:border-white dark:bg-white dark:text-black'\n                              : 'border-[#ECECEC] bg-[#F6F5FA] text-[#000000] hover:border-[#dedbdb] dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:border-white/20'\n                            }`}\n                        >\n                          ${amount}\n                        </button>\n                      );\n                    })}\n                  </div>\n                </div>\n                <div className=\"mt-1 px-4\">\n                  <motion.button\n                    layoutId=\"add-cash-button\"\n                    onClick={handleConfirm}\n                    disabled={isProcessing || isDone}\n                    className={`relative flex h-10 w-full items-center justify-start overflow-hidden rounded-full bg-neutral-900 px-6 font-semibold text-neutral-100 transition-colors sm:w-fit sm:min-w-35 dark:bg-white dark:text-black`}\n                  >\n                    <AnimatePresence mode=\"popLayout\" initial={false}>\n                      {isDone ? (\n                        <motion.div\n                          key=\"done\"\n                          initial={{ scale: 0.8, opacity: 0 }}\n                          animate={{ scale: 1, opacity: 1 }}\n                          className=\"mx-auto flex items-center justify-center gap-2\"\n                        >\n                          <div className=\"flex items-center justify-center rounded-full bg-white p-1 dark:bg-black\">\n                            <Check\n                              className=\"size-3 text-[#262629] dark:text-white\"\n                              strokeWidth={4}\n                            />\n                          </div>\n                          <span className=\"text-sm\">Done</span>\n                        </motion.div>\n                      ) : isProcessing ? (\n                        <motion.div\n                          key=\"processing\"\n                          className=\"absolute inset-0 flex items-center bg-[#AFAEB8] dark:bg-neutral-800\"\n                        >\n                          <motion.div\n                            className=\"h-full bg-[#FEFEFE] dark:bg-white\"\n                            initial={{ width: '0%' }}\n                            animate={{ width: '100%' }}\n                            transition={{ duration: 1.5, ease: 'easeInOut' }}\n                          />\n                        </motion.div>\n                      ) : (\n                        <motion.div\n                          key=\"idle\"\n                          initial={{ opacity: 0 }}\n                          animate={{ opacity: 1 }}\n                          className=\"flex items-center gap-2\"\n                        >\n                          <Plus className=\"h-4 w-4\" strokeWidth={3} />\n                          <span className=\"text-sm\">Add Cash</span>\n                        </motion.div>\n                      )}\n                    </AnimatePresence>\n                  </motion.button>\n                </div>\n              </motion.div>\n            </motion.div>\n          )}\n        </AnimatePresence>\n      </MotionConfig>\n    </div>\n  );\n};";
 
-const page = (payload: string) => String.raw`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script><script src="https://cdn.tailwindcss.com"></script><style>html,body,#root{margin:0;min-height:100%;background:transparent}body{overflow-x:hidden}.bg-neutral-900{background:#F64D86!important}.dark\:bg-white{background:#F64D86!important}</style></head><body><div id="root"></div><script type="module">
-const payload=__PAYLOAD__;const minimalSource=__MINIMAL__;const addSource=__ADD__;const heightPost=()=>window.ReactNativeWebView&&window.ReactNativeWebView.postMessage("height:"+Math.max(document.body.scrollHeight,document.documentElement.scrollHeight));
-async function boot(){const R=await import("https://esm.sh/react@19.1.0?dev");const React=R.default||R;const RD=await import("https://esm.sh/react-dom@19.1.0/client?external=react@19.1.0");const M=await import("https://esm.sh/motion@12.23.12/react?external=react@19.1.0");const L=await import("https://esm.sh/lucide-react@0.468.0?external=react@19.1.0");const RI=await import("https://esm.sh/react-icons@5.5.0/md?external=react@19.1.0");const strip=(s)=>s.replace(/^import[^;]+;\s*/gm,"").replace(/^export\s+/gm,"");const compile=(s)=>Babel.transform(strip(s),{presets:["react","typescript"]}).code;const factory=new Function("React","motion","AnimatePresence","MotionConfig","Plus","X","Wallet","Check","MoreHorizontal","Copy","MdOutlineAddCard",compile(minimalSource)+"\n"+compile(addSource)+"\nreturn {MinimalCarousel,AddCashDisclosure};");const C=factory(React,M.motion,M.AnimatePresence,M.MotionConfig,L.Plus,L.X,L.Wallet,L.Check,L.MoreHorizontal,L.Copy,RI.MdOutlineAddCard);const e=React.createElement;const iconMap={wallet:L.Wallet,receipt:L.MoreHorizontal,chart:L.MoreHorizontal,arrow:L.Plus};const cards=(payload.cards||[]).map((c)=>({...c,icon:iconMap[c.icon]||L.MoreHorizontal}));const paymentCards=[{id:"payout-wallet",last4:"",brand:"VISA",isDefault:true}];const waiters=[];window.__withdrawDone=()=>{const fn=waiters.shift();if(fn)fn()};const confirm=async(amount)=>{if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage("withdraw:"+amount);await new Promise((resolve)=>waiters.push(resolve))};const copy=(card)=>{if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage("copy:"+card.id)};function App(){return e("div",{className:"min-h-full w-full flex flex-col items-center justify-center bg-transparent px-1 py-2"},e(C.MinimalCarousel,{cards,onCopyClick:copy}),e("div",{className:"w-full mt-3"},e(C.AddCashDisclosure,{initialBalance:payload.available,cards:paymentCards,presets:payload.presets||[],onConfirm:confirm})))}RD.createRoot(document.getElementById("root")).render(e(App));new ResizeObserver(heightPost).observe(document.body);setTimeout(heightPost,500)}boot().catch((error)=>{if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage("error:"+String(error));});
-</script></body></html>`.replace("__PAYLOAD__",payload).replace("__MINIMAL__",JSON.stringify(minimalCarouselSource)).replace("__ADD__",JSON.stringify(addCashSource));
+const cardDefinitions = [
+  { id: "available", title: "Available balance", color: C.pink, icon: "wallet" },
+  { id: "pending", title: "Pending balance", color: C.plum, icon: "receipt" },
+  { id: "lifetime", title: "Lifetime earnings", color: C.ink, icon: "chart" },
+  { id: "withdrawals", title: "Withdrawals", color: "#B06B92", icon: "arrow" },
+] as const;
 
-export default function SellerBalancePayouts({ available, pendingBalance, lifetimeEarnings, withdrawals, transactions, withdrawing, onConfirm }: Props) {
-  const webView=useRef<WebView>(null); const [height,setHeight]=useState(760);
-  const cards=[{id:"available",title:"Available balance",value:money(available),color:"bg-[#F64D86]",icon:"wallet"},{id:"pending",title:"Pending balance",value:money(pendingBalance),color:"bg-[#7C486B]",icon:"receipt"},{id:"lifetime",title:"Lifetime earnings",value:money(lifetimeEarnings),color:"bg-[#171318]",icon:"chart"},{id:"withdrawals",title:"Withdrawals",value:money(withdrawals),color:"bg-[#B06B92]",icon:"arrow"}];
-  const presets=Array.from(new Set([available,Math.round(available*0.5*100)/100,Math.min(100,available)].filter((value)=>value>0))).slice(0,3); const payload=JSON.stringify({available,cards,presets,transactions}).replace(/</g,"\u003c");
-  const onMessage=async(event:WebViewMessageEvent)=>{const message=event.nativeEvent.data;if(message.startsWith("height:")){setHeight(Math.max(520,Number(message.slice(7))||760));return}if(!message.startsWith("withdraw:"))return;await onConfirm(Number(message.slice(9)));webView.current?.injectJavaScript("window.__withdrawDone&&window.__withdrawDone();true;")};
-  return <View style={s.wrap}><WebView ref={webView} originWhitelist={["*"]} source={{html:page(payload)}} javaScriptEnabled domStorageEnabled scrollEnabled={false} onMessage={onMessage} style={[s.webView,{height}]} /></View>;
+export default function SellerBalancePayouts({
+  available,
+  pendingBalance,
+  lifetimeEarnings,
+  withdrawals,
+  transactions,
+  withdrawing,
+  onConfirm,
+}: Props) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [selectedAmount, setSelectedAmount] = useState(0);
+
+  const values: Record<string, number> = {
+    available,
+    pending: pendingBalance,
+    lifetime: lifetimeEarnings,
+    withdrawals,
+  };
+  const cards = cardDefinitions.map((card) => ({ ...card, value: money(values[card.id]) }));
+  const active = cards.find((card) => card.id === activeId);
+  const secondary = cards.filter((card) => card.id !== activeId);
+  const presets = Array.from(new Set([available, Math.round(available * 0.5 * 100) / 100, Math.min(100, available)].filter((value) => value > 0))).slice(0, 3);
+
+  const selectCard = (id: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.spring);
+    setActiveId((current) => (current === id ? null : id));
+  };
+
+  const selectWithdrawal = (amount: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedAmount(amount);
+  };
+
+  const confirmWithdrawal = async () => {
+    if (selectedAmount <= 0) {
+      Alert.alert("Nothing available to withdraw", "Paid order earnings will appear here when they clear.");
+      return;
+    }
+    await onConfirm(selectedAmount);
+    setWithdrawOpen(false);
+  };
+
+  return (
+    <View style={s.wrap}>
+      <View style={s.balanceWrap}>
+        {active && (
+          <View style={[s.balanceExpanded, { backgroundColor: active.color }]}>
+            <View style={s.balanceTop}>
+              <I name={active.icon} size={38} color="#FFF" filled />
+              <Pressable style={s.copyPill} onPress={() => Alert.alert(active.title, active.value)}>
+                <Text style={s.copyText}>View</Text>
+              </Pressable>
+            </View>
+            <View style={s.balanceBottom}>
+              <View style={s.balanceCopy}>
+                <Text style={s.balanceExpandedTitle}>{active.title}</Text>
+                <Text style={s.balanceExpandedValue}>{active.value}</Text>
+              </View>
+              <Pressable style={s.editPill} onPress={() => selectCard(active.id)}>
+                <Text style={s.editText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        <View style={[s.balanceGrid, active && s.balanceGridActive]}>
+          {secondary.map((card) => (
+            <Pressable key={card.id} style={[s.balanceCard, active && s.balanceCardActive, { backgroundColor: card.color }]} onPress={() => selectCard(card.id)}>
+              <View style={s.balanceCardTop}>
+                <I name={card.icon} size={active ? 20 : 27} color="#FFF" filled />
+                <View style={s.morePill}><Text style={s.moreText}>•••</Text></View>
+              </View>
+              <View>
+                <Text numberOfLines={1} style={[s.balanceCardTitle, active && s.balanceCardTitleSmall]}>{card.title}</Text>
+                <Text numberOfLines={1} style={[s.balanceCardValue, active && s.balanceCardValueSmall]}>{card.value}</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {!withdrawOpen ? (
+        <Pressable style={[s.withdrawDisclosure, available <= 0 && s.withdrawDisabled]} onPress={() => { setWithdrawOpen(true); if (selectedAmount <= 0) setSelectedAmount(presets[1] || presets[0] || 0); }}>
+          <View style={s.walletBadge}><I name="wallet" size={23} color={C.ink} filled /></View>
+          <View style={s.withdrawCopy}>
+            <Text style={s.withdrawDisclosureLabel}>AVAILABLE TO WITHDRAW</Text>
+            <Text style={s.withdrawDisclosureBalance}>{money(available)}</Text>
+          </View>
+          <View style={s.withdrawOpen}><Text style={s.withdrawOpenText}>Withdraw</Text></View>
+        </Pressable>
+      ) : (
+        <View style={s.withdrawExpanded}>
+          <View style={s.withdrawHeader}>
+            <View>
+              <Text style={s.paymentLabel}>Withdraw available balance</Text>
+              <Text style={s.muted}>{money(available)} ready to request</Text>
+            </View>
+            <Pressable style={s.closeButton} onPress={() => setWithdrawOpen(false)}><Text style={s.closeText}>×</Text></Pressable>
+          </View>
+          <View style={s.divider} />
+          <Text style={s.paymentLabel}>Amount</Text>
+          <View style={s.amountRow}>
+            {presets.length ? presets.map((amount) => (
+              <Pressable key={amount} style={[s.amountChoice, selectedAmount === amount && s.amountChoiceOn]} onPress={() => selectWithdrawal(amount)}>
+                <Text style={[s.amountText, selectedAmount === amount && s.amountTextOn]}>{money(amount)}</Text>
+              </Pressable>
+            )) : <Text style={s.muted}>There are no cleared earnings to withdraw yet.</Text>}
+          </View>
+          <Pressable style={[s.confirmWithdraw, (withdrawing || !presets.length) && s.disabled]} disabled={withdrawing} onPress={confirmWithdrawal}>
+            <Text style={s.withdrawText}>{withdrawing ? "Requesting…" : "Request withdrawal"}</Text>
+            <I name="arrow" size={17} color="#FFF" />
+          </Pressable>
+        </View>
+      )}
+
+      <Text style={s.section}>Transactions</Text>
+      {transactions.length ? transactions.map((row) => (
+        <View key={row.id} style={s.row}>
+          <View style={s.rowIcon}><I name="receipt" size={17} color="#FFF" filled /></View>
+          <View style={s.rowCopy}>
+            <Text style={s.rowTitle}>{money(row.amount)}</Text>
+            <Text style={s.muted}>{row.status || "pending"} · {new Date(row.created_at).toLocaleDateString()}</Text>
+          </View>
+          <Text style={s.status}>{String(row.fulfillment_status || "pending").replaceAll("_", " ")}</Text>
+        </View>
+      )) : (
+        <View style={s.empty}>
+          <View style={s.emptyIcon}><I name="receipt" size={21} color="#FFF" filled /></View>
+          <Text style={s.emptyTitle}>No transactions yet</Text>
+          <Text style={s.muted}>Paid orders and recorded withdrawals will appear here.</Text>
+        </View>
+      )}
+    </View>
+  );
 }
-const s=StyleSheet.create({wrap:{width:"100%"},webView:{width:"100%",backgroundColor:"transparent"}});
+
+const s = StyleSheet.create({
+  wrap: { width: "100%" },
+  balanceWrap: { gap: 10 },
+  balanceExpanded: { minHeight: 192, borderRadius: 30, padding: 18, justifyContent: "space-between" },
+  balanceTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  copyPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#FFFFFF22" },
+  copyText: { color: "#FFF", fontWeight: "900", fontSize: 11 },
+  balanceBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 28 },
+  balanceCopy: { flex: 1, paddingRight: 8 },
+  balanceExpandedTitle: { fontSize: 19, fontWeight: "900", color: "#FFF" },
+  balanceExpandedValue: { fontSize: 17, fontWeight: "800", color: "#FFFFFFAA", marginTop: 3 },
+  editPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: "#FFFFFF55" },
+  editText: { fontSize: 11, fontWeight: "900", color: "#FFF" },
+  balanceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  balanceGridActive: { flexWrap: "nowrap" },
+  balanceCard: { flex: 1, minWidth: "47%", height: 132, borderRadius: 24, padding: 14, justifyContent: "space-between" },
+  balanceCardActive: { minWidth: 0, height: 100, borderRadius: 20, padding: 10 },
+  balanceCardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  balanceCardTitle: { fontSize: 13, fontWeight: "800", color: "#FFF" },
+  balanceCardValue: { fontSize: 15, fontWeight: "900", color: "#FFFFFFAA", marginTop: 4 },
+  balanceCardTitleSmall: { fontSize: 10 },
+  balanceCardValueSmall: { fontSize: 11 },
+  morePill: { width: 26, height: 26, borderRadius: 13, backgroundColor: "#FFFFFF22", alignItems: "center", justifyContent: "center" },
+  moreText: { color: "#FFF", fontWeight: "900", fontSize: 12, letterSpacing: -1 },
+  withdrawDisclosure: { minHeight: 78, borderRadius: 24, backgroundColor: C.pink, padding: 10, flexDirection: "row", alignItems: "center", gap: 10, marginTop: 13 },
+  withdrawDisabled: { opacity: 0.72 },
+  walletBadge: { width: 48, height: 48, borderRadius: 15, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center" },
+  withdrawCopy: { flex: 1 },
+  withdrawDisclosureLabel: { fontSize: 10, color: "#FFFFFFAA", fontWeight: "800", letterSpacing: 1 },
+  withdrawDisclosureBalance: { fontSize: 17, fontWeight: "900", color: "#FFF", marginTop: 2 },
+  withdrawOpen: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 20, backgroundColor: "#FFFFFF33" },
+  withdrawOpenText: { fontSize: 11, fontWeight: "900", color: "#FFF" },
+  withdrawExpanded: { borderRadius: 24, backgroundColor: "#FFF", padding: 13, marginTop: 13 },
+  withdrawHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  closeButton: { width: 31, height: 31, borderRadius: 16, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" },
+  closeText: { fontSize: 22, color: C.muted, lineHeight: 25 },
+  divider: { height: 1, backgroundColor: "#EEE", marginVertical: 13 },
+  paymentLabel: { fontSize: 12, fontWeight: "900", color: C.muted },
+  amountRow: { flexDirection: "row", gap: 7, marginTop: 8, minHeight: 39, alignItems: "center" },
+  amountChoice: { flex: 1, minHeight: 39, borderRadius: 12, borderWidth: 1, borderColor: "#ECE7EA", alignItems: "center", justifyContent: "center", backgroundColor: C.bg, paddingHorizontal: 4 },
+  amountChoiceOn: { borderColor: C.pink, backgroundColor: "#FFF0F6" },
+  amountText: { fontSize: 11, fontWeight: "800", color: C.ink },
+  amountTextOn: { color: C.pink },
+  confirmWithdraw: { minHeight: 45, borderRadius: 23, backgroundColor: C.pink, paddingHorizontal: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 13 },
+  withdrawText: { color: "#FFF", fontWeight: "900" },
+  disabled: { opacity: 0.6 },
+  section: { fontSize: 17, fontWeight: "900", marginTop: 22, marginBottom: 9, color: C.ink },
+  row: { minHeight: 64, borderRadius: 19, backgroundColor: "#FFF", padding: 12, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 },
+  rowIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontSize: 13, fontWeight: "900", color: C.ink },
+  status: { color: C.ink, fontSize: 11, fontWeight: "900", textTransform: "capitalize", maxWidth: 90, textAlign: "right" },
+  empty: { padding: 25, borderRadius: 22, backgroundColor: "#FFF", alignItems: "center" },
+  emptyIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.ink, alignItems: "center", justifyContent: "center" },
+  emptyTitle: { fontSize: 16, fontWeight: "900", marginTop: 8, color: C.ink },
+  muted: { fontSize: 11, color: C.muted, marginTop: 4 },
+});
