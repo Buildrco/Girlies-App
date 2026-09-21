@@ -67,8 +67,8 @@ const imgs = [
   'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1000&q=85',
 ];
 
-const heroGirlImage = { uri: imgs[0] };
-const askGirlsImage = { uri: imgs[1] };
+const heroGirlImage = require('../assets/hero-girl.png');
+const askGirlsImage = require('../assets/ask-girls.png');
 
 export default function Home() {
   const router = useRouter();
