@@ -120,13 +120,14 @@ export default function Home() {
         supabase.from('posts').select('id,author_id,body,media_urls,metadata,created_at').eq('visibility', 'public').order('created_at', { ascending: false }).limit(1).then(result => result.data?.[0] || null, () => null),
       ]);
       if (!active) return;
-      const liveSellers = profilesResult as SellerProfile[];
+      const liveSellers = (profilesResult.length ? profilesResult : (cached?.sellerProfiles || [])) as SellerProfile[];
+      const liveProducts = productsResult.length ? productsResult : (cached?.products || []);
       const initialSnapshot: HomeSnapshot = {
         sessionUserId: me?.id || null,
-        currentProfile: currentResult,
+        currentProfile: currentResult || cached?.currentProfile || null,
         sellerProfiles: liveSellers,
         sellerIds: liveSellers.map(row => row.id),
-        products: productsResult,
+        products: liveProducts,
         homePost: null,
         followedIndexes: [],
         liked: false,
@@ -134,9 +135,9 @@ export default function Home() {
         homeCommentCount: 0,
         homeShareCount: 0,
       };
-      setCurrentProfile(currentResult); setSellerProfiles(liveSellers); setSellerIds(liveSellers.map(row => row.id)); setProducts(productsResult);
+      setCurrentProfile(currentResult || cached?.currentProfile || null); setSellerProfiles(liveSellers); setSellerIds(liveSellers.map(row => row.id)); setProducts(liveProducts);
       void writeOffline(HOME_CACHE_KEY, initialSnapshot);
-      const post = postResult as HomePost | null;
+      const post = (postResult || cached?.homePost || null) as HomePost | null;
       if (!post) {
         if (active) applySnapshot(initialSnapshot);
         return;
