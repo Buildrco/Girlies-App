@@ -32,6 +32,16 @@ export const MARKETPLACE_CATEGORIES: CategoryDefinition[] = [
   { slug: 'digital-products', label: 'Digital Products', subtitle: 'Downloads, templates & tools', icon: 'digital', color: '#C4D1F7', image: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?auto=format&fit=crop&w=1000&q=85', subcategories: ['Templates', 'Courses', 'E-books', 'Software', 'Presets'] },
 ];
 
+
+export const MAIN_CATEGORIES: CategoryDefinition[] = [
+  { slug: 'shop', label: 'SHOP', subtitle: 'Products, sellers & everyday finds', icon: 'shop', color: '#FFD45A', image: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=1200&q=85', subcategories: [] },
+  { slug: 'services', label: 'SERVICES', subtitle: 'Trusted help for every plan', icon: 'services', color: '#BDE7A5', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1200&q=85', subcategories: ['Beauty & Grooming', 'Home & Cleaning', 'Repairs & Maintenance', 'Construction & Skilled Trades', 'Photography & Video', 'Design & Creative', 'Technology & Digital', 'Business & Professional', 'Education & Tutoring', 'Events & Entertainment', 'Transport & Delivery', 'Health & Wellness', 'Personal Services', 'Other'] },
+  { slug: 'events', label: 'EVENTS', subtitle: 'Plans, places & people to see', icon: 'events', color: '#FFB7C9', image: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=85', subcategories: ['Entertainment', 'Music', 'Sports', 'Education & Learning', 'Business & Networking', 'Religious & Spiritual', 'Arts & Culture', 'Food & Culinary', 'Fashion & Beauty', 'Community', 'Family & Social', 'Health & Wellness', 'Technology', 'Conferences & Exhibitions', 'Charity & Fundraising', 'Other'] },
+  { slug: 'jobs-careers', label: 'JOBS & CAREERS', subtitle: 'Opportunities for your next chapter', icon: 'jobs', color: '#B8D7F2', image: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1200&q=85', subcategories: ['Administration & Office', 'Accounting & Finance', 'Sales & Marketing', 'Technology & IT', 'Design & Creative', 'Media & Communications', 'Engineering', 'Healthcare', 'Education', 'Hospitality & Tourism', 'Construction & Skilled Trades', 'Transport & Logistics', 'Retail & Customer Service', 'Legal & Professional', 'Agriculture', 'Government & NGO', 'Other'] },
+  { slug: 'property', label: 'PROPERTY', subtitle: 'Homes, land & spaces to make yours', icon: 'property', color: '#D9C7A8', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=85', subcategories: ['Houses', 'Apartments', 'Land', 'Commercial Property', 'Offices', 'Shops & Retail', 'Warehouses', 'Industrial Property', 'Student Accommodation', 'Short-Stay', 'Other'] },
+  { slug: 'vehicles', label: 'VEHICLES', subtitle: 'Cars, bikes & everything that moves', icon: 'vehicles', color: '#B89CFF', image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=85', subcategories: ['Cars', 'Motorcycles', 'Trucks', 'Vans', 'Buses', 'Trailers', 'Heavy Equipment', 'Boats', 'Other'] },
+];
+
 export function getCategory(slug: string) {
-  return MARKETPLACE_CATEGORIES.find(category => category.slug === slug) || MARKETPLACE_CATEGORIES[0];
+  return MARKETPLACE_CATEGORIES.find(category => category.slug === slug) || MAIN_CATEGORIES.find(category => category.slug === slug) || MARKETPLACE_CATEGORIES[0];
 }

@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../../constants/theme';
 import { I } from '../../../components/Icons';
 import { ProductCard } from '../../../components/ProductCard';
-import { getCategory, MARKETPLACE_CATEGORIES } from '../../../constants/categories';
+import { getCategory, MAIN_CATEGORIES, MARKETPLACE_CATEGORIES } from '../../../constants/categories';
 import { getProducts, getServices, getStore, type ProductRecord, type ServiceRecord } from '../../../lib/social';
 import { useCart } from '../../../lib/cart';
 
@@ -83,6 +83,7 @@ export default function CategoryScreen() {
   const { slug, store: storeParam } = useLocalSearchParams<{ slug?: string; store?: string }>();
   const slugValue = Array.isArray(slug) ? slug[0] : slug || '';
   const isServices = slugValue === 'services';
+  const isMainCategory = MAIN_CATEGORIES.some(item => item.slug === slugValue && item.slug !== 'shop');
   const category = isServices ? SERVICE_CATEGORY : getCategory(slugValue);
   const storeSlug = Array.isArray(storeParam) ? storeParam[0] : storeParam;
   const [products, setProducts] = useState<ProductRecord[]>([]);
@@ -142,11 +143,15 @@ export default function CategoryScreen() {
     return () => { active = false; };
   }, [category.label, isServices, storeSlug, minPrice, maxPrice, sort]);
 
-  const routeToCategory = (nextSlug: string) => router.replace({ pathname: '/shop/category/[slug]', params: { slug: nextSlug, ...(storeSlug ? { store: storeSlug } : {}) } });
-  const visibleCategories = useMemo(() => isServices ? []
+  const routeToCategory = (nextSlug: string) => nextSlug === 'shop'
+    ? router.replace('/shop/marketplace')
+    : router.replace({ pathname: '/shop/category/[slug]', params: { slug: nextSlug, ...(storeSlug && !isMainCategory ? { store: storeSlug } : {}) } });
+  const visibleCategories = useMemo(() => isMainCategory
+    ? MAIN_CATEGORIES.filter(item => item.slug !== 'shop')
+    : isServices ? []
     : store?.categories?.length
     ? MARKETPLACE_CATEGORIES.filter(item => store.categories.includes(item.slug))
-    : MARKETPLACE_CATEGORIES, [isServices, store]);
+    : MARKETPLACE_CATEGORIES, [isMainCategory, isServices, store]);
   const visibleProducts = useMemo(() => products.filter(product => {
     if (!matchesCategoryFilter(product, condition) || !matchesCategoryFilter(product, categoryOption) || !hasDelivery(product, deliveryOption)) return false;
     if (buyingFormat === 'all') return true;
@@ -216,10 +221,10 @@ export default function CategoryScreen() {
 
   return <SafeAreaView style={s.safe}>
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-       <View style={s.top}><Pressable onPress={() => router.back()} style={s.back}><I name="back" size={27} /></Pressable><View style={s.topCopy}><Text style={s.k}>{store ? store.name.toUpperCase() : 'MARKETPLACE'}</Text><Text style={s.h}>{category.label}</Text></View><Pressable style={s.cartCircle} onPress={() => router.push('/cart')}><I name="cart" size={19} color="#FFF" filled />{count > 0 && <View style={s.count}><Text style={s.countText}>{count > 99 ? '99+' : count}</Text></View>}</Pressable></View>
-      <View style={[s.hero, { backgroundColor: category.color }]}><Image source={{ uri: category.image }} style={s.heroImage} /><View style={s.heroTint} /><View style={s.heroCopy}><View style={s.icon}><I name={category.icon} size={24} color={C.ink} filled /></View><Text style={s.heroTitle}>{category.subtitle}</Text><Text style={s.heroText}>{isServices ? 'Choose a provider and book your next appointment.' : store ? `Only ${store.name}'s ${category.label.toLowerCase()} picks.` : 'Discover products from shops across the marketplace.'}</Text></View></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRail}><Pressable style={s.changeChip} onPress={() => router.replace(storeSlug ? { pathname: '/seller/[id]', params: { id: storeSlug } } : '/shop')}><Text style={s.changeText}>{isServices ? 'Marketplace' : 'All categories'}</Text></Pressable>{visibleCategories.map(item => <Pressable key={item.slug} onPress={() => routeToCategory(item.slug)} style={[s.categoryChip, item.slug === category.slug && s.categoryChipOn]}><I name={item.icon} size={15} color={item.slug === category.slug ? '#FFF' : C.ink} filled /><Text style={[s.categoryText, item.slug === category.slug && s.categoryTextOn]}>{item.label}</Text></Pressable>)}</ScrollView>
-      <Text style={s.subheading}>{isServices ? 'Choose a service type' : `Explore ${category.label.toLowerCase()}`}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subRail}>{category.subcategories.map(item => <Pressable key={item} accessibilityLabel={item} style={s.subChip} onPress={() => { setDraftCategoryOption(item); setCategoryOption(item); }}><Image source={{ uri: SUBCATEGORY_IMAGES[item] || category.image }} style={s.subImage} /></Pressable>)}</ScrollView>
+       <View style={s.top}><Pressable onPress={() => router.back()} style={s.back}><I name="back" size={27} /></Pressable><View style={s.topCopy}><Text style={s.k}>{store ? store.name.toUpperCase() : isMainCategory ? 'GIRLIES' : 'MARKETPLACE'}</Text><Text style={s.h}>{category.label}</Text></View><Pressable style={s.cartCircle} onPress={() => router.push('/cart')}><I name="cart" size={19} color="#FFF" filled />{count > 0 && <View style={s.count}><Text style={s.countText}>{count > 99 ? '99+' : count}</Text></View>}</Pressable></View>
+      <View style={[s.hero, { backgroundColor: category.color }]}><Image source={{ uri: category.image }} style={s.heroImage} /><View style={s.heroTint} /><View style={s.heroCopy}><View style={s.icon}><I name={category.icon} size={24} color={C.ink} filled /></View><Text style={s.heroTitle}>{category.subtitle}</Text><Text style={s.heroText}>{isServices ? 'Choose a provider and book your next appointment.' : store ? `Only ${store.name}'s ${category.label.toLowerCase()} picks.` : isMainCategory ? `Explore ${category.label.toLowerCase()} from people and businesses across the community.` : 'Discover products from shops across the marketplace.'}</Text></View></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.categoryRail}><Pressable style={s.changeChip} onPress={() => router.replace(storeSlug ? { pathname: '/seller/[id]', params: { id: storeSlug } } : isMainCategory ? '/shop' : '/shop/marketplace')}><Text style={s.changeText}>{isServices || isMainCategory ? 'Explore categories' : 'All categories'}</Text></Pressable>{visibleCategories.map(item => <Pressable key={item.slug} onPress={() => routeToCategory(item.slug)} style={[s.categoryChip, item.slug === category.slug && s.categoryChipOn]}><I name={item.icon} size={15} color={item.slug === category.slug ? '#FFF' : C.ink} filled /><Text style={[s.categoryText, item.slug === category.slug && s.categoryTextOn]}>{item.label}</Text></Pressable>)}</ScrollView>
+      <Text style={s.subheading}>{isServices ? 'Choose a service type' : `Explore ${category.label.toLowerCase()}`}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.subRail}>{category.subcategories.map(item => <Pressable key={item} accessibilityLabel={item} style={s.subChip} onPress={() => { setDraftCategoryOption(item); setCategoryOption(item); }}><Image source={{ uri: SUBCATEGORY_IMAGES[item] || category.image }} style={s.subImage} /><View style={s.subShade} /><Text style={s.subText}>{item}</Text></Pressable>)}</ScrollView>
        <View style={s.controlRow}>
          <Pressable style={[s.controlButton, sort !== 'best_match' && s.controlButtonOn]} onPress={openSort}>
            <Text style={s.sortGlyph}>⇅</Text>
@@ -306,6 +311,8 @@ const s = StyleSheet.create({
    subRail: { gap: 8, paddingVertical: 9 },
    subChip: { width: 88, height: 58, borderRadius: 16, overflow: 'hidden', backgroundColor: '#FFF', borderWidth: 1, borderColor: C.line },
    subImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+   subShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#17131855' },
+   subText: { position: 'absolute', left: 8, right: 8, bottom: 7, color: '#FFF', fontSize: 10, fontWeight: '900' },
   resultHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 10 },
   resultTitle: { fontSize: 18, fontWeight: '900' },
   resultMeta: { fontSize: 11, color: C.muted },

@@ -48,6 +48,8 @@ const icons: Record<string, { outline: keyof typeof Ionicons.glyphMap; filled?: 
   tools: { outline: 'hammer-outline', filled: 'hammer' },
   business: { outline: 'briefcase-outline', filled: 'briefcase' },
   digital: { outline: 'cloud-download-outline', filled: 'cloud-download' },
+  events: { outline: 'calendar-outline', filled: 'calendar' },
+  jobs: { outline: 'briefcase-outline', filled: 'briefcase' },
   wallet: { outline: 'wallet-outline', filled: 'wallet' },
   receipt: { outline: 'receipt-outline', filled: 'receipt' },
   people: { outline: 'people-outline', filled: 'people' },
