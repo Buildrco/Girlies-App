@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, DimensionValue, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Animated, DimensionValue, Pressable, ScrollView, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { MotionPressable } from './MotionPressable';
 import { C } from '../constants/theme';
 import { LikeButton } from './LikeButton';
@@ -33,7 +34,7 @@ export function ProductCard({ name, price, image, images, seller, verified = tru
   }
   return <MotionPressable onPress={onPress} style={{ width: gridWidth || 174, marginRight: gridWidth ? '0%' : 12, marginBottom: gridWidth ? 14 : 0 }}>
     <View style={{ height: gridWidth ? 170 : 190, borderRadius: 28, overflow: 'hidden', backgroundColor: '#F1E9EC', position: 'relative' }}>
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} nestedScrollEnabled>{(images?.filter(Boolean).length ? images.filter(Boolean) : [image]).map((uri, index) => <Image key={uri + '-' + index} source={{ uri }} style={{ width: cardWidth, height: '100%' }} resizeMode="cover" />)}</ScrollView>
+      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} nestedScrollEnabled>{(images?.filter(Boolean).length ? images.filter(Boolean) : [image]).map((uri, index) => <Image key={uri + '-' + index} source={{ uri }} cachePolicy="memory-disk" contentFit="cover" style={{ width: cardWidth, height: '100%' }} />)}</ScrollView>
       <View style={{ position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}><LikeButton liked={liked} onPress={() => void toggleLike()} size={19} /></View>
       <Animated.View style={[cardStyles.cartButton, { transform: [{ scale: addScale }] }]}><Pressable onPress={addToCart} style={cardStyles.cartPress}><I name={adding ? 'check' : 'cart'} size={19} color={C.pink} filled={!adding} /></Pressable></Animated.View>
     </View>
