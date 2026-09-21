@@ -6,10 +6,13 @@ import { C } from '../constants/theme';
 import { I } from '../components/Icons';
 import { useChromeVisibility } from '../components/BottomNav';
 import { MAIN_CATEGORIES } from '../constants/categories';
+import { getCategoryDefinitions } from '../lib/social';
 
 export default function Shop() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
+  const [categories, setCategories] = React.useState(MAIN_CATEGORIES);
+  React.useEffect(() => { let active = true; getCategoryDefinitions('main').then(rows => { if (active && rows.length) setCategories(rows); }).catch(() => {}); return () => { active = false; }; }, []);
   const openCategory = (slug: string) => {
     if (slug === 'shop') {
       router.push('/shop/marketplace');
@@ -23,7 +26,7 @@ export default function Shop() {
       <View style={s.top}><Text style={s.k}>EXPLORE GIRLIES</Text><Text style={s.h}>Find your next move.</Text></View>
       <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><Pressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></Pressable></View>
       <View style={s.grid}>
-        {MAIN_CATEGORIES.map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 2 || index === 5 ? s.cardWide : index === 3 || index === 4 ? s.cardHalfTall : s.cardHalf, { backgroundColor: category.color }]}>
+        {categories.map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 2 || index === 5 ? s.cardWide : index === 3 || index === 4 ? s.cardHalfTall : s.cardHalf, { backgroundColor: category.color }]}>
           <View style={s.cardIcon}><I name={category.icon} size={index === 2 || index === 5 ? 38 : 32} color={C.ink} filled /></View>
           <Text style={s.cardTitle}>{category.label}</Text>
         </Pressable>)}

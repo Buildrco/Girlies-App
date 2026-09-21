@@ -1,3 +1,4 @@
+import type { CategoryDefinition } from '../constants/categories';
 import { supabase } from './supabase';
 
 export type MediaItem = {
@@ -617,6 +618,15 @@ export async function updateService(serviceId: string, input: { name: string; de
     if (error) throw new Error(`Service update failed: ${errorMessage(error, 'Supabase rejected the service')}`);
     return data as ServiceRecord;
   } catch (error) { await removeUploadedMedia(uploadedPaths); throw error; }
+}
+
+
+export async function getCategoryDefinitions(group?: 'main' | 'marketplace'): Promise<CategoryDefinition[]> {
+  let query = supabase.from('marketplace_categories').select('slug,label,subtitle,icon,color,image,subcategories,category_group,sort_order').eq('active', true).order('sort_order', { ascending: true });
+  if (group) query = query.eq('category_group', group);
+  const { data, error } = await query;
+  if (error) throw new Error('Could not load categories: ' + errorMessage(error, 'Supabase rejected the request'));
+  return (data || []).map((row: any) => ({ slug: row.slug, label: row.label, subtitle: row.subtitle || '', icon: row.icon, color: row.color, image: row.image, subcategories: Array.isArray(row.subcategories) ? row.subcategories : [], })) as CategoryDefinition[];
 }
 
 export async function getServices(ownerId?: string) {
