@@ -13,6 +13,7 @@ import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { getCurrentProfile, getPostLikeState, getProducts, getSessionUser, setFollow, setPostLike, type ProductRecord, type ProfileRecord } from '../lib/social';
+import { readOffline, writeOffline } from '../lib/offlineCache';
 
 type HomePost = {
   id: string;
@@ -42,6 +43,22 @@ type SellerProfile = {
   location?: string | null;
 };
 
+type HomeSnapshot = {
+  sessionUserId: string | null;
+  currentProfile: ProfileRecord | null;
+  sellerIds: string[];
+  sellerProfiles: SellerProfile[];
+  products: ProductRecord[];
+  homePost: HomePost | null;
+  followedIndexes: number[];
+  liked: boolean;
+  homeLikeCount: number | null;
+  homeCommentCount: number;
+  homeShareCount: number;
+};
+
+const HOME_CACHE_KEY = 'home-v2';
+
 const imgs = [
   'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1000&q=85',
   'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=85',
@@ -49,6 +66,9 @@ const imgs = [
   'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=1000&q=85',
   'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1000&q=85',
 ];
+
+const heroGirlImage = require('../assets/hero-girl.png');
+const askGirlsImage = require('../assets/ask-girls.png');
 
 export default function Home() {
   const router = useRouter();
@@ -71,9 +91,25 @@ export default function Home() {
   const [likeBusy, setLikeBusy] = useState(false);
   useFocusEffect(useCallback(() => {
     let active = true;
-    setSellerIds([]); setSellerProfiles([]); setProducts([]); setHomePostId(null); setHomePost(null);
-    setFollowed(new Set()); setLiked(false); setHomeLikeCount(null); setHomeCommentCount(0); setHomeShareCount(0);
+    const applySnapshot = (snapshot: HomeSnapshot) => {
+      setSessionUserId(snapshot.sessionUserId || null);
+      setCurrentProfile(snapshot.currentProfile || null);
+      setSellerIds(snapshot.sellerIds || []);
+      setSellerProfiles(snapshot.sellerProfiles || []);
+      setProducts(snapshot.products || []);
+      setHomePost(snapshot.homePost || null);
+      setHomePostId(snapshot.homePost?.id || null);
+      setFollowed(new Set(snapshot.followedIndexes || []));
+      setLiked(Boolean(snapshot.liked));
+      setHomeLikeCount(snapshot.homeLikeCount ?? null);
+      setHomeCommentCount(snapshot.homeCommentCount || 0);
+      setHomeShareCount(snapshot.homeShareCount || 0);
+    };
+
     async function loadLiveState() {
+      const cached = await readOffline<HomeSnapshot>(HOME_CACHE_KEY);
+      if (!active) return;
+      if (cached) applySnapshot(cached);
       const me = await getSessionUser().catch(() => null);
       if (!active) return;
       setSessionUserId(me?.id || null);
@@ -85,9 +121,26 @@ export default function Home() {
       ]);
       if (!active) return;
       const liveSellers = profilesResult as SellerProfile[];
+      const initialSnapshot: HomeSnapshot = {
+        sessionUserId: me?.id || null,
+        currentProfile: currentResult,
+        sellerProfiles: liveSellers,
+        sellerIds: liveSellers.map(row => row.id),
+        products: productsResult,
+        homePost: null,
+        followedIndexes: [],
+        liked: false,
+        homeLikeCount: null,
+        homeCommentCount: 0,
+        homeShareCount: 0,
+      };
       setCurrentProfile(currentResult); setSellerProfiles(liveSellers); setSellerIds(liveSellers.map(row => row.id)); setProducts(productsResult);
+      void writeOffline(HOME_CACHE_KEY, initialSnapshot);
       const post = postResult as HomePost | null;
-      if (!post) return;
+      if (!post) {
+        if (active) applySnapshot(initialSnapshot);
+        return;
+      }
       const postId = post.id;
       const [profile, followedRows, postLiked, likeCount, commentCount, shareCount] = await Promise.all([
         supabase.from('profiles').select('display_name,handle,avatar_url,verified').eq('id', post.author_id).maybeSingle().then(result => result.data || undefined, () => undefined),
@@ -98,10 +151,13 @@ export default function Home() {
         supabase.from('post_shares').select('id', { count: 'exact', head: true }).eq('post_id', postId).then(result => result.count || 0, () => 0),
       ]);
       if (!active) return;
-      setHomePost({ ...post, media_urls: post.media_urls || [], profile }); setHomePostId(postId); setLiked(postLiked);
+      const resolvedPost = { ...post, media_urls: post.media_urls || [], profile };
       const followedIds = new Set((followedRows as { following_id: string }[]).map(row => row.following_id));
-      setFollowed(new Set(liveSellers.map((row, index) => followedIds.has(row.id) ? index : -1).filter(index => index >= 0)));
+      const followedIndexes = liveSellers.map((row, index) => followedIds.has(row.id) ? index : -1).filter(index => index >= 0);
+      setHomePost(resolvedPost); setHomePostId(postId); setLiked(postLiked);
+      setFollowed(new Set(followedIndexes));
       setHomeLikeCount(likeCount); setHomeCommentCount(commentCount); setHomeShareCount(shareCount);
+      void writeOffline(HOME_CACHE_KEY, { ...initialSnapshot, homePost: resolvedPost, followedIndexes, liked: postLiked, homeLikeCount: likeCount, homeCommentCount: commentCount, homeShareCount: shareCount });
     }
     void loadLiveState();
     return () => { active = false; };
@@ -140,12 +196,19 @@ export default function Home() {
       Alert.alert('Like failed', error instanceof Error ? error.message : 'Could not save your like.');
     } finally { setLikeBusy(false); }
   }
+  const bannerWidth = Math.max(280, width - 36);
+  const banners = [
+    { image: heroGirlImage, imageFit: 'contain' as const, title: 'Your next look is waiting.', subtitle: 'Discover women-led shops, real recommendations and new drops.', tag: 'NEW SEASON', color: C.rose },
+    { image: imgs[1], imageFit: 'cover' as const, title: 'Fresh beauty, fresh energy.', subtitle: 'Find the little upgrades that make your everyday feel better.', tag: 'BEAUTY EDIT', color: C.sun },
+    { image: imgs[2], imageFit: 'cover' as const, title: 'Made for your main-character era.', subtitle: 'Shop pieces picked for the life you actually live.', tag: 'THE GIRLIE DROP', color: C.lilac },
+  ];
+
   return <SafeAreaView style={s.safe}>
     <Animated.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.head}><View><Text style={s.kicker}>SATURDAY · 12 SEPTEMBER</Text><Text style={s.title}>Hey, girlie ✦</Text></View><View style={s.headIcons}><Pressable onPress={() => router.push('/notifications')}><I name="bell" size={25} /><View style={s.dot} /></Pressable><Pressable onPress={() => router.push('/profile')}><Avatar size={42} index={1} uri={currentProfile?.avatar_url} verified={currentProfile?.verified} /></Pressable></View></View>
       <Pressable style={s.search} onPress={() => router.push('/search')}><I name="search" size={22} color={C.muted} /><Text style={s.searchText}>What are you looking for?</Text><I name="filter" size={20} /></Pressable>
-      <View><ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={event => setHero(Math.round(event.nativeEvent.contentOffset.x / width))}>{imgs.slice(0, 3).map((image, index) => <View key={image} style={{ width }}><CurvedBanner image={image} title={['Your next look is waiting.', 'Fresh beauty, fresh energy.', 'Made for your main-character era.'][index]} subtitle="Discover women-led shops, real recommendations and new drops." tag={['NEW SEASON', 'BEAUTY EDIT', 'THE GIRLIE DROP'][index]} color={[C.rose, C.sun, C.lilac][index]} onPress={() => router.push('/shop')} /></View>)}</ScrollView><View style={s.heroDots}>{[0, 1, 2].map(i => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
-      <View style={s.ribbon}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View>
+       <View><ScrollView horizontal pagingEnabled snapToInterval={bannerWidth + 12} decelerationRate="fast" showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 18 }} onMomentumScrollEnd={event => setHero(Math.round(event.nativeEvent.contentOffset.x / (bannerWidth + 12)))}>{banners.map((banner, index) => <View key={banner.title} style={{ width: bannerWidth, marginRight: index === banners.length - 1 ? 0 : 12 }}><CurvedBanner {...banner} onPress={() => router.push('/shop')} /></View>)}</ScrollView><View style={s.heroDots}>{banners.map((_, i) => <Pressable key={i} onPress={() => setHero(i)} style={[s.heroDot, i === hero && s.heroDotOn]} />)}</View></View>
+      <View style={s.ribbon}><View style={s.ribbonCopy}><Text style={s.ribbonBig}>Ask the girls.</Text><Text style={s.ribbonSmall}>Real opinions before you spend.</Text><Pressable onPress={() => router.push('/community')}><Text style={s.ribbonGo}>Open community →</Text></Pressable></View><Image source={askGirlsImage} style={s.ribbonImage} resizeMode="contain" /></View>
        <SectionTitle title="Popular sellers" onPress={() => router.push('/shop')} />
          <ScrollView horizontal nestedScrollEnabled directionalLockEnabled decelerationRate="fast" showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 6 }}>{sellerProfiles.map((seller, index) => { const isMe = seller.id === sessionUserId; const place = [seller.area && seller.location ? `${seller.area} - ${seller.location}` : seller.area || seller.location, seller.country].filter(Boolean).join(', '); return <Pressable key={seller.id} onPress={() => router.push('/seller/' + seller.id)} style={s.seller}><Avatar size={54} index={index} uri={seller.avatar_url} /><View style={s.sellerNameRow}><Text style={s.sellerName} numberOfLines={1}>{seller.display_name}</Text>{seller.verified && <VerifiedMark size={17} />}</View><Text style={s.sellerHandle}>@{seller.handle}</Text><Text style={s.sellerMeta}>{place || 'Location not added'}</Text><Text style={s.sellerMeta}>{(seller.followers_count || 0).toLocaleString()} followers</Text>{!isMe && <Pressable onPress={event => { event.stopPropagation(); void toggleSeller(index); }} style={s.follow}><Text style={s.followText}>{followed.has(index) ? 'Following' : 'Follow'}</Text></Pressable>}</Pressable>; })}</ScrollView>
       <SectionTitle title="Popular products" onPress={() => router.push('/shop')} />
@@ -160,5 +223,5 @@ export default function Home() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg }, scroll: { paddingHorizontal: 18, paddingBottom: 105 }, head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, paddingBottom: 16 }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, color: C.muted }, title: { fontSize: 28, fontWeight: '900', marginTop: 4, color: C.ink }, headIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 }, dot: { position: 'absolute', right: -2, top: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: C.pink, borderWidth: 2, borderColor: C.bg }, search: { height: 54, borderRadius: 27, backgroundColor: '#F4EDEF', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 17, gap: 11, marginBottom: 18 }, searchText: { flex: 1, color: C.muted, fontWeight: '600', fontSize: 14 }, heroDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 3 }, heroDot: { width: 6, height: 6, borderRadius: 4, backgroundColor: '#D8C6CC' }, heroDotOn: { width: 19, backgroundColor: C.ink }, ribbon: { marginTop: 19, borderRadius: 28, backgroundColor: C.plum, padding: 18, overflow: 'hidden' }, ribbonBig: { color: '#FFF', fontSize: 23, fontWeight: '900' }, ribbonSmall: { color: '#F4DDE7', fontSize: 12, fontWeight: '600', marginTop: 3 }, ribbonGo: { color: C.sun, fontSize: 11, fontWeight: '900', marginTop: 14 }, seller: { width: 166, marginRight: 12, padding: 13, borderRadius: 28, backgroundColor: C.cream }, sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8 }, sellerName: { fontSize: 13, fontWeight: '900', maxWidth: 120 }, sellerHandle: { fontSize: 11, color: C.muted, marginTop: 3 }, sellerMeta: { fontSize: 11, color: C.muted, marginTop: 4 }, follow: { alignSelf: 'flex-start', marginTop: 9, backgroundColor: C.white, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 }, followText: { fontSize: 10, fontWeight: '900' }, editorial: { marginTop: 27, borderRadius: 32, overflow: 'hidden', backgroundColor: C.sun, minHeight: 290 }, editorialImg: { width: '100%', height: 180 }, editorialText: { padding: 18 }, editorialK: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, editorialTitle: { fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 6 }, editorialSub: { fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 5 }, darkBtn: { alignSelf: 'flex-start', backgroundColor: C.ink, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, marginTop: 13 }, post: { backgroundColor: C.white, borderRadius: 30, padding: 15, borderWidth: 1, borderColor: C.line }, postTop: { flexDirection: 'row', alignItems: 'center', gap: 10 }, postUser: { fontSize: 14, fontWeight: '900' }, postMeta: { fontSize: 10, color: C.muted, marginTop: 2 }, postText: { fontSize: 14, lineHeight: 20, fontWeight: '600', marginVertical: 13 }, postImg: { height: 270, width: '100%', borderRadius: 24 }, postFoot: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12 }, postAction: { flexDirection: 'row', alignItems: 'center', gap: 4 }, mini: { marginTop: 18, padding: 20, borderRadius: 28, backgroundColor: C.mint }, miniTitle: { fontSize: 19, fontWeight: '900' }, miniText: { fontSize: 12, fontWeight: '600', marginTop: 5 }, miniLink: { fontSize: 12, fontWeight: '900', marginTop: 12 },
+  safe: { flex: 1, backgroundColor: C.bg }, scroll: { paddingHorizontal: 18, paddingBottom: 105 }, head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, paddingBottom: 16 }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, color: C.muted }, title: { fontSize: 28, fontWeight: '900', marginTop: 4, color: C.ink }, headIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 }, dot: { position: 'absolute', right: -2, top: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: C.pink, borderWidth: 2, borderColor: C.bg }, search: { height: 54, borderRadius: 27, backgroundColor: '#F4EDEF', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 17, gap: 11, marginBottom: 18 }, searchText: { flex: 1, color: C.muted, fontWeight: '600', fontSize: 14 }, heroDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 10 }, heroDot: { width: 6, height: 6, borderRadius: 4, backgroundColor: '#D8C6CC' }, heroDotOn: { width: 19, backgroundColor: C.ink }, ribbon: { marginTop: 19, minHeight: 142, borderRadius: 28, backgroundColor: C.plum, padding: 18, overflow: 'hidden', position: 'relative' }, ribbonCopy: { width: '66%', zIndex: 1 }, ribbonImage: { position: 'absolute', right: -8, bottom: -6, width: '43%', height: 158 }, ribbonBig: { color: '#FFF', fontSize: 23, fontWeight: '900' }, ribbonSmall: { color: '#F4DDE7', fontSize: 12, fontWeight: '600', marginTop: 3 }, ribbonGo: { color: C.sun, fontSize: 11, fontWeight: '900', marginTop: 14 }, seller: { width: 166, marginRight: 12, padding: 13, borderRadius: 28, backgroundColor: C.cream }, sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 8 }, sellerName: { fontSize: 13, fontWeight: '900', maxWidth: 120 }, sellerHandle: { fontSize: 11, color: C.muted, marginTop: 3 }, sellerMeta: { fontSize: 11, color: C.muted, marginTop: 4 }, follow: { alignSelf: 'flex-start', marginTop: 9, backgroundColor: C.white, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 }, followText: { fontSize: 10, fontWeight: '900' }, editorial: { marginTop: 27, borderRadius: 32, overflow: 'hidden', backgroundColor: C.sun, minHeight: 290 }, editorialImg: { width: '100%', height: 180 }, editorialText: { padding: 18 }, editorialK: { fontSize: 9, fontWeight: '900', letterSpacing: 1.3 }, editorialTitle: { fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 6 }, editorialSub: { fontSize: 12, lineHeight: 17, fontWeight: '600', marginTop: 5 }, darkBtn: { alignSelf: 'flex-start', backgroundColor: C.ink, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18, marginTop: 13 }, post: { backgroundColor: C.white, borderRadius: 30, padding: 15, borderWidth: 1, borderColor: C.line }, postTop: { flexDirection: 'row', alignItems: 'center', gap: 10 }, postUser: { fontSize: 14, fontWeight: '900' }, postMeta: { fontSize: 10, color: C.muted, marginTop: 2 }, postText: { fontSize: 14, lineHeight: 20, fontWeight: '600', marginVertical: 13 }, postImg: { height: 270, width: '100%', borderRadius: 24 }, postFoot: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12 }, postAction: { flexDirection: 'row', alignItems: 'center', gap: 4 }, mini: { marginTop: 18, padding: 20, borderRadius: 28, backgroundColor: C.mint }, miniTitle: { fontSize: 19, fontWeight: '900' }, miniText: { fontSize: 12, fontWeight: '600', marginTop: 5 }, miniLink: { fontSize: 12, fontWeight: '900', marginTop: 12 },
 });
