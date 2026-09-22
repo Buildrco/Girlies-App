@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
 import { I } from '../components/Icons';
+import { MotionPressable } from '../components/MotionPressable';
 import { useChromeVisibility } from '../components/BottomNav';
 import { MAIN_CATEGORIES } from '../constants/categories';
 import { getCategoryDefinitions } from '../lib/social';
@@ -40,19 +41,19 @@ export default function Shop() {
   return <SafeAreaView style={s.safe}>
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} onScroll={onScroll} scrollEventThrottle={16}>
       <View style={s.top}><Text style={s.k}>EXPLORE GIRLIES</Text><Text style={s.h}>Find your next move.</Text></View>
-      <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><Pressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></Pressable></View>
+      <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><MotionPressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></MotionPressable></View>
       <View style={s.grid}>
         <View style={s.column}>
-          {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
+          {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
             <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.slug === 'jobs-careers' ? <>JOBS{'\n'}&amp; CAREERS</> : category.label}</Text>
-          </Pressable>)}
+          </MotionPressable>)}
         </View>
         <View style={s.column}>
-          {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
+          {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
             <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
-          </Pressable>)}
+          </MotionPressable>)}
         </View>
       </View>
       <View style={s.footer}><Text style={s.footerTitle}>Buy, book, join and find your people.</Text><Text style={s.footerText}>Everything you need, arranged around real life.</Text></View>
