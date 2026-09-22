@@ -332,10 +332,10 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
   const heroEnter = useRef(new Animated.Value(18)).current;
   const filterEnter = useRef(new Animated.Value(20)).current;
   const listEnter = useRef(new Animated.Value(24)).current;
-  const enterOpacity = useRef(new Animated.Value(0)).current;
+  const enterOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.stagger(120, [
-      Animated.parallel([Animated.timing(heroEnter, { toValue: 0, duration: 520, useNativeDriver: true }), Animated.timing(enterOpacity, { toValue: 1, duration: 420, useNativeDriver: true })]),
+      Animated.timing(heroEnter, { toValue: 0, duration: 520, useNativeDriver: true }),
       Animated.timing(filterEnter, { toValue: 0, duration: 520, useNativeDriver: true }),
       Animated.timing(listEnter, { toValue: 0, duration: 520, useNativeDriver: true }),
     ]).start();
@@ -417,12 +417,12 @@ const s = StyleSheet.create({
   eventsSectionTitle: { fontSize: 19, fontWeight: '900' },
   eventsViewAll: { color: C.pink, fontSize: 11, fontWeight: '900' },
   eventsRail: { gap: 12, paddingHorizontal: 18 },
-  upcomingCard: { width: 174, height: 188, borderRadius: 22, backgroundColor: C.plum, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
+  upcomingCard: { width: 174, height: 172, borderRadius: 22, backgroundColor: C.plum, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
   eventCardContent: { flex: 1 },
   upcomingImage: { ...StyleSheet.absoluteFillObject },
   eventImageShade: { ...StyleSheet.absoluteFillObject },
   upcomingArrow: { position: 'absolute', right: 10, bottom: 12, width: 34, height: 34, borderRadius: 17, overflow: 'hidden', backgroundColor: '#17131866', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
-  upcomingGlass: { position: 'absolute', left: 8, right: 8, bottom: 8, minHeight: 82, borderRadius: 17, overflow: 'hidden', padding: 10, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#FFFFFF88' },
+  upcomingGlass: { position: 'absolute', left: 8, right: 8, bottom: 8, minHeight: 72, borderRadius: 17, overflow: 'hidden', padding: 10, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#FFFFFF88' },
   upcomingGlassTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   upcomingPrice: { color: C.pink, fontSize: 10, fontWeight: '900' },
   upcomingDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
@@ -434,9 +434,9 @@ const s = StyleSheet.create({
   eventsPillText: { fontSize: 10, fontWeight: '900', color: C.muted },
   eventsPillTextOn: { color: '#FFF' },
   featuredStack: { gap: 14, paddingHorizontal: 18, paddingTop: 15 },
-  featuredEvent: { height: 312, backgroundColor: C.plum, borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
+  featuredEvent: { height: 280, backgroundColor: C.plum, borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
   featuredImage: { ...StyleSheet.absoluteFillObject },
-  featuredGlass: { position: 'absolute', left: 10, right: 10, bottom: 10, minHeight: 126, borderRadius: 22, overflow: 'hidden', padding: 14, backgroundColor: '#FFFFFF55', borderWidth: 1, borderColor: '#FFFFFF88' },
+  featuredGlass: { position: 'absolute', left: 10, right: 10, bottom: 10, minHeight: 108, borderRadius: 22, overflow: 'hidden', padding: 14, backgroundColor: '#FFFFFF55', borderWidth: 1, borderColor: '#FFFFFF88' },
   featuredArrowCircle: { position: 'absolute', right: 14, bottom: 18, width: 42, height: 42, borderRadius: 21, overflow: 'hidden', backgroundColor: '#17131866', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
   featuredDateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   featuredDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
