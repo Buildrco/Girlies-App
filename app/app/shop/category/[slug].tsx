@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Animated, Image, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -8,7 +8,7 @@ import { C } from '../../../constants/theme';
 import { I } from '../../../components/Icons';
 import { ProductCard } from '../../../components/ProductCard';
 import { getCategory, MAIN_CATEGORIES, MARKETPLACE_CATEGORIES } from '../../../constants/categories';
-import { getProducts, getPublishedEvents, getServices, getStore, purchaseSellerEventTicket, type ProductRecord, type SellerEvent, type ServiceRecord } from '../../../lib/social';
+import { getProducts, getPublishedEvents, getServices, getStore, type ProductRecord, type SellerEvent, type ServiceRecord } from '../../../lib/social';
 import { useCart } from '../../../lib/cart';
 
 const sortOptions = [['best_match', 'Recommended'], ['newest', 'Recently added'], ['price_low', 'Price: Low to High'], ['price_high', 'Price: High to Low']] as const;
@@ -302,8 +302,6 @@ export default function CategoryScreen() {
 
 function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent[]; loading: boolean; error: string }) {
   const { width } = useWindowDimensions();
-  const [selected, setSelected] = useState<SellerEvent | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [eventFilter, setEventFilter] = useState('All events');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -319,7 +317,6 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
       Animated.timing(listEnter, { toValue: 0, duration: 520, useNativeDriver: true }),
     ]).start();
   }, []);
-  const detailY = useRef(new Animated.Value(260)).current;
   const filterPages = [
     { label: 'All events', copy: 'Everything happening around you', options: ['Upcoming', 'All locations', 'Recommended'] },
     { label: 'Concerts', copy: 'Music, live shows and good energy', options: ['Music', 'This month', 'Near me'] },
@@ -337,22 +334,7 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
     const matches = events.filter(event => (event.name + ' ' + event.description).toLowerCase().includes(needle));
     return matches.length ? matches : events;
   })();
-  const openEvent = (event: SellerEvent) => { detailY.setValue(260); setSelected(event); setDetailOpen(false); };
-  const expandDetails = () => { setDetailOpen(true); Animated.spring(detailY, { toValue: 0, useNativeDriver: true, bounciness: 5 }).start(); };
-  const closeEvent = () => { setSelected(null); setDetailOpen(false); };
-  const toggleSearch = () => {
-    const next = !searchOpen;
-    setSearchOpen(next);
-    Animated.timing(searchProgress, { toValue: next ? 1 : 0, duration: 360, useNativeDriver: false }).start();
-    if (!next) setSearchQuery('');
-  };
-  const buy = async (event: SellerEvent)
-    try {
-      await purchaseSellerEventTicket(event.id);
-      Alert.alert('Ticket reserved', 'Your ticket is ready in your Girlies account.');
-      closeEvent();
-    } catch (e: any) { Alert.alert('Could not reserve ticket', e?.message || 'Please sign in and try again.'); }
-  };
+  const openEvent = (event: SellerEvent) => router.push({ pathname: '/shop/category/event-detail', params: { id: event.id } });
   return <SafeAreaView style={s.eventsSafe}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.eventsScroll}>
       <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: heroEnter }] }}><LinearGradient colors={[C.rose, C.lilac, C.mint]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.eventsHero}>
@@ -362,7 +344,7 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
         <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><Pressable style={s.eventsIcon}><I name="bell" size={20} color={C.ink} /></Pressable></View>
       </LinearGradient>
       <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Upcoming Events</Text><Text style={s.eventsViewAll}>View all</Text></View>
-      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}</Animated.View>
+      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><View style={s.upcomingArrow}><I name="forward" size={16} color="#FFF" /></View><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}</Animated.View>
        <Animated.View style={{ opacity: enterOpacity, transform: [{ translateX: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Browse event filters</Text>
       <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ width }} onMomentumScrollEnd={event => { const page = Math.round(event.nativeEvent.contentOffset.x / width); setEventFilter(filterPages[page]?.label || 'All events'); }}>
         {filterPages.map((page, index) => <Pressable key={page.label} onPress={() => setEventFilter(page.label)} style={[s.eventsFilterPage, { width }]}><View style={[s.eventsFilterPanel, eventFilter === page.label && s.eventsFilterPanelOn]}><View><Text style={s.eventsFilterK}>{index + 1} / {filterPages.length}</Text><Text style={s.eventsFilterTitle}>{page.label}</Text><Text style={s.eventsFilterCopy}>{page.copy}</Text></View><View style={s.eventsFilterOptions}>{page.options.map(option => <View key={option} style={s.eventsFilterOption}><Text style={s.eventsFilterOptionText}>{option}</Text></View>)}</View></View></Pressable>)}
@@ -370,9 +352,9 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
       <View style={s.eventsPagerDots}>{filterPages.map(page => <View key={page.label} style={[s.eventsPagerDot, eventFilter === page.label && s.eventsPagerDotOn]} />)}</View></Animated.View>
        <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: listEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>{eventFilter}</Text><Text style={s.eventsViewAll}>{visibleEvents.length} events</Text></View>
       <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>{eventFilter}</Text><Text style={s.eventsViewAll}>{visibleEvents.length} events</Text></View>
-      <View style={s.featuredStack}>{visibleEvents.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} resizeMode="cover" /><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View></Animated.View>
+      <View style={s.featuredStack}>{visibleEvents.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} resizeMode="cover" /><View style={s.featuredArrowCircle}><I name="forward" size={17} color="#FFF" /></View><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View></Animated.View>
     </ScrollView>
-    <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={closeEvent}><View style={s.eventModalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={closeEvent} />{selected && !detailOpen && <Pressable style={s.eventPeek} onPress={expandDetails}><Image source={{ uri: eventImage(selected, 0) }} style={s.eventPeekImage} resizeMode="cover" /><BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} /><View style={s.eventPeekShade} /><BlurView intensity={28} tint="light" style={s.eventPeekGlass} /><View style={s.eventPeekCopy}><Text style={s.eventDetailK}>UPCOMING EVENT</Text><Text style={s.eventPeekTitle} numberOfLines={2}>{selected.name}</Text><Text style={s.eventPeekMeta}>{eventDateTime(selected.starts_at)}</Text></View><BlurView intensity={35} tint="light" style={s.eventPeekArrow}><I name="forward" size={24} color="#FFF" /></BlurView></Pressable>}{selected && detailOpen && <Animated.View style={[s.eventDetail, { transform: [{ translateY: detailY }] }]}><Image source={{ uri: eventImage(selected, 0) }} style={s.eventDetailImage} resizeMode="cover" /><View style={s.eventDetailCopy}><View style={s.eventDetailHeader}><Text style={s.eventDetailK}>EVENT DETAILS</Text><Pressable onPress={closeEvent}><Text style={s.close}>×</Text></Pressable></View><View style={s.eventDetailPriceRow}><Text style={s.eventDetailDate}>{eventDate(selected.starts_at)}</Text><Text style={s.eventDetailPrice}>{Number(selected.ticket_price || 0) > 0 ? 'GH₵ ' + Number(selected.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.eventDetailTitle}>{selected.name}</Text><Text style={s.eventDetailMeta}>{selected.event_mode === 'physical' ? selected.location || 'Physical location' : 'Online in Girlies'} · {eventDateTime(selected.starts_at)}</Text><Text style={s.eventDetailDescription}>{selected.description || 'Planning an event can be a daunting task, especially when you have a lot to manage.'}</Text><Pressable style={s.buyTicket} onPress={() => void buy(selected)}><Text style={s.buyTicketText}> {Number(selected.ticket_price || 0) > 0 ? 'Buy ticket · GH₵ ' + Number(selected.ticket_price).toFixed(0) : 'Get free ticket'} </Text></Pressable></View></Animated.View>}</View></Modal>
+
   </SafeAreaView>;
 }
 
@@ -415,6 +397,7 @@ const s = StyleSheet.create({
   eventsRail: { gap: 12, paddingHorizontal: 18 },
   upcomingCard: { width: 174, borderRadius: 22, backgroundColor: '#FFF', overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
   upcomingImage: { width: '100%', height: 92 },
+  upcomingArrow: { position: 'absolute', right: 10, top: 52, width: 34, height: 34, borderRadius: 17, backgroundColor: '#171318CC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
   upcomingCopy: { padding: 10 },
   upcomingDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
   upcomingName: { fontSize: 13, lineHeight: 16, fontWeight: '900', marginTop: 4 },
@@ -427,6 +410,7 @@ const s = StyleSheet.create({
   featuredStack: { gap: 14, paddingHorizontal: 18, paddingTop: 15 },
   featuredEvent: { backgroundColor: '#FFF', borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
   featuredImage: { width: '100%', height: 172 },
+  featuredArrowCircle: { position: 'absolute', right: 14, top: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: '#171318CC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
   featuredCopy: { padding: 14 },
   featuredDateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   featuredDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
