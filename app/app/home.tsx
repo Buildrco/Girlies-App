@@ -202,9 +202,9 @@ export default function Home() {
   }
   const bannerWidth = Math.max(280, width - 36);
   const banners = [
-    { image: heroGirlImage, imageFit: 'contain' as const, title: 'Find your next look.', subtitle: 'Shop women-led brands and fresh drops.', tag: 'NEW SEASON', color: C.rose },
-    { image: studyBannerImage, imageFit: 'cover' as const, overlay: true, textColor: '#FFF', title: 'Make time for you.', subtitle: 'Little rituals. Big glow.', tag: 'BEAUTY EDIT', color: C.plum },
-    { image: skincareBannerImage, imageFit: 'cover' as const, overlay: true, textColor: '#FFF', title: 'Your glow, your way.', subtitle: 'Simple care for every day.', tag: 'THE GIRLIE DROP', color: C.rose },
+    { image: heroGirlImage, imageFit: 'contain' as const, title: 'Find your next look.', subtitle: 'Fresh looks and new drops.', tag: 'NEW SEASON', color: C.rose },
+    { image: studyBannerImage, imageFit: 'contain' as const, overlay: true, copySide: 'right' as const, textColor: '#FFF', title: 'Make time for you.', subtitle: 'Little rituals. Big glow.', tag: 'BEAUTY EDIT', color: C.plum },
+    { image: skincareBannerImage, imageFit: 'contain' as const, overlay: true, textColor: '#FFF', title: 'Your glow, your way.', subtitle: 'Simple care for every day.', tag: 'THE GIRLIE DROP', color: C.rose },
   ];
 
   return <SafeAreaView style={s.safe}>
