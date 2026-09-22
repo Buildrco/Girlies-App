@@ -6,6 +6,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C } from '../../../constants/theme';
 import { I } from '../../../components/Icons';
+import { MotionPressable, ScreenEntrance } from '../../../components/MotionPressable';
+import { readOffline, writeOffline } from '../../../lib/offlineCache';
 import { getPublishedEvents, purchaseSellerEventTicket, type SellerEvent } from '../../../lib/social';
 
 const EVENT_ART = [
@@ -16,6 +18,7 @@ const EVENT_ART = [
 const eventImage = (event: SellerEvent) => event.banner_url || EVENT_ART[0];
 const eventDate = (value: string) => new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 const eventDateTime = (value: string) => new Date(value).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+const EVENT_CACHE_KEY = 'published-events-v1';
 
 export default function EventDetailScreen() {
   const router = useRouter();
@@ -28,12 +31,15 @@ export default function EventDetailScreen() {
   useEffect(() => {
     let active = true;
     (async () => {
+      const cachedEvents = await readOffline<SellerEvent[]>(EVENT_CACHE_KEY);
+      const cachedEvent = cachedEvents?.find(row => row.id === eventId) || null;
+      if (active && cachedEvent) { setEvent(cachedEvent); setError(''); setLoading(false); }
       try {
         const rows = await getPublishedEvents();
         const match = rows.find(row => row.id === eventId) || null;
-        if (active) { setEvent(match); setError(match ? '' : 'This event is no longer available.'); }
+        if (active) { setEvent(match); setError(match ? '' : 'This event is no longer available.'); void writeOffline(EVENT_CACHE_KEY, rows); }
       } catch (e: any) {
-        if (active) setError(e?.message || 'Could not load this event.');
+        if (active && !cachedEvent) setError(e?.message || 'Could not load this event.');
       } finally {
         if (active) setLoading(false);
       }
@@ -52,9 +58,10 @@ export default function EventDetailScreen() {
   };
 
   return <SafeAreaView style={s.safe}>
+    <ScreenEntrance resetKey={eventId} style={{ flex: 1 }}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
       <LinearGradient colors={[C.rose, C.lilac, C.mint]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.header}>
-        <Pressable style={s.back} onPress={() => router.back()}><I name="back" size={23} color={C.ink} /></Pressable>
+        <MotionPressable style={s.back} onPress={() => router.back()}><I name="back" size={23} color={C.ink} /></MotionPressable>
         <Text style={s.headerLabel}>EVENT DETAILS</Text>
         <View style={s.headerSpacer} />
       </LinearGradient>
@@ -76,10 +83,11 @@ export default function EventDetailScreen() {
           <View style={s.infoRow}><View style={s.infoIcon}><I name="location" size={18} color={C.pink} /></View><View><Text style={s.infoLabel}>Location</Text><Text style={s.infoValue}>{event.event_mode === 'physical' ? event.location || 'Physical location' : 'Online in Girlies'}</Text></View></View>
           <View style={s.infoRow}><View style={s.infoIcon}><I name="calendar" size={18} color={C.pink} /></View><View><Text style={s.infoLabel}>Date & time</Text><Text style={s.infoValue}>{eventDateTime(event.starts_at)}</Text></View></View>
           <View style={s.participants}><View style={s.avatarOne} /><View style={s.avatarTwo} /><View style={s.avatarThree} /><Text style={s.participantText}>+2k&nbsp;&nbsp; Participants</Text></View>
-          <Pressable style={s.buyButton} onPress={() => void buyTicket}><Text style={s.buyText}>{Number(event.ticket_price || 0) > 0 ? 'Buy Ticket · GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Get Free Ticket'}</Text><I name="forward" size={20} color="#FFF" /></Pressable>
+          <MotionPressable style={s.buyButton} onPress={() => void buyTicket}><Text style={s.buyText}>{Number(event.ticket_price || 0) > 0 ? 'Buy Ticket · GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Get Free Ticket'}</Text><I name="forward" size={20} color="#FFF" /></MotionPressable>
         </View>
       </View>}
     </ScrollView>
+    </ScreenEntrance>
   </SafeAreaView>;
 }
 
