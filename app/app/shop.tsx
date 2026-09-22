@@ -7,6 +7,8 @@ import { I } from '../components/Icons';
 import { useChromeVisibility } from '../components/BottomNav';
 import { MAIN_CATEGORIES } from '../constants/categories';
 import { getCategoryDefinitions } from '../lib/social';
+const LOCAL_CATEGORY_LABELS: Record<string, string> = { property: 'PROPERTIES' };
+
 const LOCAL_CATEGORY_IMAGES: Record<string, string> = {
   shop: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-shop.png',
   services: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-services.png',
@@ -16,7 +18,10 @@ const LOCAL_CATEGORY_IMAGES: Record<string, string> = {
   vehicles: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-vehicles.png',
 };
 
-const applyLocalCategoryImages = (rows: typeof MAIN_CATEGORIES) => rows.map(category => ({ ...category, image: LOCAL_CATEGORY_IMAGES[category.slug] || category.image }));
+const applyLocalCategoryImages = (rows: typeof MAIN_CATEGORIES) => rows.map(category => ({ ...category, label: LOCAL_CATEGORY_LABELS[category.slug] || category.label, image: LOCAL_CATEGORY_IMAGES[category.slug] || category.image }));
+
+const categoryImageStyle = (slug: string) => [s.cardImage, slug === 'shop' && s.cardImageShop, slug === 'services' && s.cardImageServices, slug === 'events' && s.cardImageEvents, slug === 'jobs-careers' && s.cardImageJobs, slug === 'property' && s.cardImageProperty, slug === 'vehicles' && s.cardImageVehicles];
+const categoryTitleStyle = (slug: string) => [s.cardTitle, slug === 'events' && s.cardTitleEvents, slug === 'services' && s.cardTitleServices, slug === 'jobs-careers' && s.cardTitleJobs, slug === 'property' && s.cardTitleProperty];
 
 
 export default function Shop() {
@@ -39,14 +44,14 @@ export default function Shop() {
       <View style={s.grid}>
         <View style={s.column}>
           {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
-            <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="contain" />
-            <Text style={s.cardTitle}>{category.label}</Text>
+            <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
+            <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
           </Pressable>)}
         </View>
         <View style={s.column}>
           {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
-            <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="contain" />
-            <Text style={s.cardTitle}>{category.label}</Text>
+            <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
+            <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
           </Pressable>)}
         </View>
       </View>
@@ -73,7 +78,17 @@ const s = StyleSheet.create({
   cardMini: { height: 92 },
   cardHorizontal: { height: 112 },
   cardImage: { position: 'absolute', right: -14, bottom: -4, width: '108%', height: '105%', borderRadius: 18, zIndex: 0 },
-  cardTitle: { position: 'absolute', left: 14, top: 14, color: C.ink, fontSize: 13, lineHeight: 16, fontWeight: '900', maxWidth: '62%', zIndex: 2 },
+  cardImageShop: { right: -40, bottom: -24, width: '138%', height: '145%' },
+  cardImageServices: { right: -48, bottom: -22, width: '134%', height: '140%' },
+  cardImageEvents: { right: -42, bottom: -26, width: '136%', height: '142%' },
+  cardImageJobs: { right: -34, bottom: -20, width: '132%', height: '138%' },
+  cardImageProperty: { right: -46, bottom: -26, width: '140%', height: '145%' },
+  cardImageVehicles: { right: -52, bottom: -30, width: '146%', height: '150%' },
+  cardTitle: { position: 'absolute', left: 14, top: 14, color: C.ink, fontSize: 12, lineHeight: 15, fontWeight: '900', maxWidth: '64%', zIndex: 2 },
+  cardTitleEvents: { left: '35%', maxWidth: '52%', textAlign: 'center' },
+  cardTitleServices: { maxWidth: '42%', fontSize: 11.5 },
+  cardTitleJobs: { maxWidth: '74%', fontSize: 11.5, lineHeight: 14 },
+  cardTitleProperty: { maxWidth: '60%' },
   cardSpacer: { flex: 1 },
   footer: { marginTop: 18, padding: 20, borderRadius: 25, backgroundColor: C.ink },
   footerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900' },
