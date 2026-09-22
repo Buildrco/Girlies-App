@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../../constants/theme';
 import { I } from '../../../components/Icons';
@@ -300,35 +301,50 @@ export default function CategoryScreen() {
 }
 
 function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent[]; loading: boolean; error: string }) {
-  const router = useRouter();
-  const { count } = useCart();
+  const { width } = useWindowDimensions();
   const [selected, setSelected] = useState<SellerEvent | null>(null);
-  const [buying, setBuying] = useState(false);
-  const featured = events.slice(0, 4);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [eventFilter, setEventFilter] = useState('All events');
+  const detailY = useRef(new Animated.Value(260)).current;
+  const filterPages = [
+    { label: 'All events', copy: 'Everything happening around you', options: ['Upcoming', 'All locations', 'Recommended'] },
+    { label: 'Concerts', copy: 'Music, live shows and good energy', options: ['Music', 'This month', 'Near me'] },
+    { label: 'Community', copy: 'Meet people who get your vibe', options: ['Community', 'Free events', 'Near me'] },
+    { label: 'Workshops', copy: 'Learn something useful together', options: ['Learning', 'Weekend', 'Online'] },
+    { label: 'Beauty', copy: 'Beauty, fashion and self-care plans', options: ['Beauty', 'This month', 'Near me'] },
+  ];
+  const visibleEvents = eventFilter === 'All events' ? events : (() => {
+    const needle = eventFilter.toLowerCase().replace('s', '');
+    const matches = events.filter(event => (event.name + ' ' + event.description).toLowerCase().includes(needle));
+    return matches.length ? matches : events;
+  })();
+  const openEvent = (event: SellerEvent) => { detailY.setValue(260); setSelected(event); setDetailOpen(false); };
+  const expandDetails = () => { setDetailOpen(true); Animated.spring(detailY, { toValue: 0, useNativeDriver: true, bounciness: 5 }).start(); };
+  const closeEvent = () => { setSelected(null); setDetailOpen(false); };
   const buy = async (event: SellerEvent) => {
-    if (buying) return;
-    setBuying(true);
     try {
       await purchaseSellerEventTicket(event.id);
       Alert.alert('Ticket reserved', 'Your ticket is ready in your Girlies account.');
-      setSelected(null);
-    } catch (e: any) {
-      Alert.alert('Could not reserve ticket', e?.message || 'Please sign in and try again.');
-    } finally { setBuying(false); }
+      closeEvent();
+    } catch (e: any) { Alert.alert('Could not reserve ticket', e?.message || 'Please sign in and try again.'); }
   };
   return <SafeAreaView style={s.eventsSafe}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.eventsScroll}>
-      <LinearGradient colors={['#D7A8EF', '#E9B5D9', '#F4D0DE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.eventsHero}>
-        <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><View style={s.eventsHeroActions}><Pressable style={s.eventsIcon}><I name="bell" size={19} color={C.ink} /></Pressable><Pressable style={s.eventsCart} onPress={() => router.push('/cart')}><I name="cart" size={18} color="#FFF" filled />{count > 0 && <View style={s.eventsCount}><Text style={s.eventsCountText}>{count > 9 ? '9+' : count}</Text></View>}</Pressable></View></View>
+      <LinearGradient colors={[C.rose, C.lilac, C.mint]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.eventsHero}>
+        <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><Pressable style={s.eventsIcon}><I name="bell" size={20} color={C.ink} /></Pressable></View>
         <View style={s.eventsSearch}><I name="search" size={19} color={C.muted} /><Text style={s.eventsSearchText}>Search events</Text><I name="filter" size={18} color={C.muted} /></View>
       </LinearGradient>
       <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Upcoming Events</Text><Text style={s.eventsViewAll}>View all</Text></View>
-      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{events.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => setSelected(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} /><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}
-      <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Top Picks 🔥</Text><Text style={s.eventsViewAll}>View all</Text></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsPills}>{['All', 'Concert', 'Community', 'Workshops', 'Beauty'].map((item, index) => <Pressable key={item} style={[s.eventsPill, index === 0 && s.eventsPillOn]}><Text style={[s.eventsPillText, index === 0 && s.eventsPillTextOn]}>{item}</Text></Pressable>)}</ScrollView>
-      <View style={s.featuredStack}>{featured.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => setSelected(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} /><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View>
+      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}
+      <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Browse event filters</Text><Text style={s.eventsViewAll}>Swipe →</Text></View>
+      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ width }} onMomentumScrollEnd={event => { const page = Math.round(event.nativeEvent.contentOffset.x / width); setEventFilter(filterPages[page]?.label || 'All events'); }}>
+        {filterPages.map((page, index) => <Pressable key={page.label} onPress={() => setEventFilter(page.label)} style={[s.eventsFilterPage, { width }]}><View style={[s.eventsFilterPanel, eventFilter === page.label && s.eventsFilterPanelOn]}><View><Text style={s.eventsFilterK}>{index + 1} / {filterPages.length}</Text><Text style={s.eventsFilterTitle}>{page.label}</Text><Text style={s.eventsFilterCopy}>{page.copy}</Text></View><View style={s.eventsFilterOptions}>{page.options.map(option => <View key={option} style={s.eventsFilterOption}><Text style={s.eventsFilterOptionText}>{option}</Text></View>)}</View></View></Pressable>)}
+      </ScrollView>
+      <View style={s.eventsPagerDots}>{filterPages.map(page => <View key={page.label} style={[s.eventsPagerDot, eventFilter === page.label && s.eventsPagerDotOn]} />)}</View>
+      <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>{eventFilter}</Text><Text style={s.eventsViewAll}>{visibleEvents.length} events</Text></View>
+      <View style={s.featuredStack}>{visibleEvents.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} resizeMode="cover" /><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View>
     </ScrollView>
-    <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={() => setSelected(null)}><View style={s.eventModalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSelected(null)} /><View style={s.eventDetail}>{selected && <><Image source={{ uri: eventImage(selected, 0) }} style={s.eventDetailImage} /><View style={s.eventDetailCopy}><View style={s.eventDetailHeader}><Text style={s.eventDetailK}>EVENT DETAILS</Text><Pressable onPress={() => setSelected(null)}><Text style={s.close}>×</Text></Pressable></View><Text style={s.eventDetailTitle}>{selected.name}</Text><Text style={s.eventDetailMeta}>{selected.event_mode === 'physical' ? selected.location || 'Physical location' : 'Online in Girlies'} · {eventDateTime(selected.starts_at)}</Text><Text style={s.eventDetailDescription}>{selected.description || 'Planning an event can be a daunting task, especially when you have a lot to manage.'}</Text><Pressable style={s.buyTicket} onPress={() => void buy(selected)}><Text style={s.buyTicketText}>{buying ? 'Reserving…' : Number(selected.ticket_price || 0) > 0 ? 'Buy ticket · GH₵ ' + Number(selected.ticket_price).toFixed(0) : 'Get free ticket'}</Text></Pressable></View></>}</View></View></Modal>
+    <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={closeEvent}><View style={s.eventModalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={closeEvent} />{selected && !detailOpen && <Pressable style={s.eventPeek} onPress={expandDetails}><Image source={{ uri: eventImage(selected, 0) }} style={s.eventPeekImage} resizeMode="cover" /><BlurView intensity={38} tint="dark" style={StyleSheet.absoluteFill} /><View style={s.eventPeekShade} /><View style={s.eventPeekCopy}><Text style={s.eventDetailK}>UPCOMING EVENT</Text><Text style={s.eventPeekTitle} numberOfLines={2}>{selected.name}</Text><Text style={s.eventPeekMeta}>{eventDateTime(selected.starts_at)}</Text></View><View style={s.eventPeekArrow}><I name="forward" size={24} color="#FFF" /></View></Pressable>}{selected && detailOpen && <Animated.View style={[s.eventDetail, { transform: [{ translateY: detailY }] }]}><Image source={{ uri: eventImage(selected, 0) }} style={s.eventDetailImage} resizeMode="cover" /><View style={s.eventDetailCopy}><View style={s.eventDetailHeader}><Text style={s.eventDetailK}>EVENT DETAILS</Text><Pressable onPress={closeEvent}><Text style={s.close}>×</Text></Pressable></View><Text style={s.eventDetailTitle}>{selected.name}</Text><Text style={s.eventDetailMeta}>{selected.event_mode === 'physical' ? selected.location || 'Physical location' : 'Online in Girlies'} · {eventDateTime(selected.starts_at)}</Text><Text style={s.eventDetailDescription}>{selected.description || 'Planning an event can be a daunting task, especially when you have a lot to manage.'}</Text><Pressable style={s.buyTicket} onPress={() => void buy(selected)}><Text style={s.buyTicketText}> {Number(selected.ticket_price || 0) > 0 ? 'Buy ticket · GH₵ ' + Number(selected.ticket_price).toFixed(0) : 'Get free ticket'} </Text></Pressable></View></Animated.View>}</View></Modal>
   </SafeAreaView>;
 }
 
@@ -338,7 +354,7 @@ function FilterRow({ label, value, onPress }: { label: string; value: string; on
 }
 
 const s = StyleSheet.create({
-  eventsSafe: { flex: 1, backgroundColor: '#F7F2FA' },
+  eventsSafe: { flex: 1, backgroundColor: C.bg },
   eventsScroll: { paddingBottom: 110 },
   eventsHero: { minHeight: 190, padding: 18, paddingTop: 18, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
   eventsHeroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -346,7 +362,19 @@ const s = StyleSheet.create({
   eventsLocation: { fontSize: 21, fontWeight: '900', marginTop: 4 },
   eventsHeroActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   eventsIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFFAA', alignItems: 'center', justifyContent: 'center' },
-  eventsCart: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
+
+  eventsFilterPage: { paddingHorizontal: 18 },
+  eventsFilterPanel: { minHeight: 124, borderRadius: 28, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, padding: 16, justifyContent: 'space-between' },
+  eventsFilterPanelOn: { borderColor: C.pink, backgroundColor: '#FFF8FA' },
+  eventsFilterK: { color: C.pink, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  eventsFilterTitle: { fontSize: 20, fontWeight: '900', marginTop: 3 },
+  eventsFilterCopy: { color: C.muted, fontSize: 10, marginTop: 3 },
+  eventsFilterOptions: { flexDirection: 'row', gap: 6, marginTop: 12 },
+  eventsFilterOption: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 12, backgroundColor: C.bg },
+  eventsFilterOptionText: { color: C.muted, fontSize: 9, fontWeight: '800' },
+  eventsPagerDots: { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 9 },
+  eventsPagerDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.line },
+  eventsPagerDotOn: { width: 16, backgroundColor: C.pink },
   eventsCount: { position: 'absolute', right: -3, top: -3, width: 16, height: 16, borderRadius: 8, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
   eventsCountText: { color: '#FFF', fontSize: 8, fontWeight: '900' },
   eventsSearch: { height: 48, borderRadius: 24, backgroundColor: '#FFFFFFE8', flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 15, marginTop: 30 },
@@ -382,8 +410,15 @@ const s = StyleSheet.create({
   eventsEmpty: { marginHorizontal: 18, padding: 24, borderRadius: 22, backgroundColor: '#FFF', alignItems: 'center' },
   eventsEmptyTitle: { fontSize: 16, fontWeight: '900' },
   eventsEmptyText: { color: C.muted, fontSize: 11, textAlign: 'center', marginTop: 6 },
-  eventModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#1B102866' },
-  eventDetail: { backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  eventModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#17131888' },
+  eventPeek: { height: 190, margin: 18, borderRadius: 30, overflow: 'hidden', backgroundColor: C.plum, position: 'relative' },
+  eventPeekImage: { ...StyleSheet.absoluteFillObject, opacity: 0.8 },
+  eventPeekShade: { ...StyleSheet.absoluteFillObject, backgroundColor: '#17131866' },
+  eventPeekCopy: { position: 'absolute', left: 20, right: 78, bottom: 20 },
+  eventPeekTitle: { color: '#FFF', fontSize: 24, lineHeight: 27, fontWeight: '900', marginTop: 5 },
+  eventPeekMeta: { color: '#FFFFFFCC', fontSize: 10, fontWeight: '700', marginTop: 7 },
+  eventPeekArrow: { position: 'absolute', right: 17, bottom: 17, width: 58, height: 58, borderRadius: 29, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
+  eventDetail: { maxHeight: '88%', backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
   eventDetailImage: { width: '100%', height: 210 },
   eventDetailCopy: { padding: 18, paddingBottom: 28 },
   eventDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
