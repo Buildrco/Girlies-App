@@ -7,12 +7,23 @@ import { I } from '../components/Icons';
 import { useChromeVisibility } from '../components/BottomNav';
 import { MAIN_CATEGORIES } from '../constants/categories';
 import { getCategoryDefinitions } from '../lib/social';
+const LOCAL_CATEGORY_IMAGES: Record<string, string> = {
+  shop: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-shop.png',
+  services: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-services.png',
+  events: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-events.png',
+  'jobs-careers': 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-jobs.png',
+  property: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-property.png',
+  vehicles: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-vehicles.png',
+};
+
+const applyLocalCategoryImages = (rows: typeof MAIN_CATEGORIES) => rows.map(category => ({ ...category, image: LOCAL_CATEGORY_IMAGES[category.slug] || category.image }));
+
 
 export default function Shop() {
   const router = useRouter();
   const { onScroll } = useChromeVisibility();
-  const [categories, setCategories] = React.useState(MAIN_CATEGORIES);
-  React.useEffect(() => { let active = true; getCategoryDefinitions('main').then(rows => { if (active && rows.length) setCategories(rows); }).catch(() => {}); return () => { active = false; }; }, []);
+  const [categories, setCategories] = React.useState(applyLocalCategoryImages(MAIN_CATEGORIES));
+  React.useEffect(() => { let active = true; getCategoryDefinitions('main').then(rows => { if (active && rows.length) setCategories(applyLocalCategoryImages(rows)); }).catch(() => {}); return () => { active = false; }; }, []);
   const openCategory = (slug: string) => {
     if (slug === 'shop') {
       router.push('/shop/marketplace');
@@ -57,12 +68,12 @@ const s = StyleSheet.create({
   seeAllText: { fontSize: 12, fontWeight: '900', color: C.plum },
   grid: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   column: { width: '48.5%', gap: 10 },
-  card: { width: '100%', borderRadius: 34, overflow: 'hidden', padding: 10, justifyContent: 'space-between' },
+  card: { width: '100%', borderRadius: 34, overflow: 'hidden', padding: 10, justifyContent: 'space-between', position: 'relative' },
   cardVertical: { height: 168 },
   cardMini: { height: 92 },
   cardHorizontal: { height: 112 },
-  cardImage: { width: '100%', height: '68%', borderRadius: 18 },
-  cardTitle: { color: C.ink, fontSize: 19, lineHeight: 22, fontWeight: '900', maxWidth: '92%' },
+  cardImage: { position: 'absolute', right: -18, bottom: -10, width: '84%', height: '92%', borderRadius: 18, zIndex: 0 },
+  cardTitle: { color: C.ink, fontSize: 14, lineHeight: 17, fontWeight: '900', maxWidth: '62%', zIndex: 1, marginTop: 'auto' },
   cardSpacer: { flex: 1 },
   footer: { marginTop: 18, padding: 20, borderRadius: 25, backgroundColor: C.ink },
   footerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900' },
