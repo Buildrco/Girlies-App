@@ -1,11 +1,12 @@
 import { supabase } from './supabase';
+import { staleWhileRevalidateFetch } from './offlineCache';
 
 const API = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!API) throw new Error('The app backend URL is not configured. Set EXPO_PUBLIC_API_URL for orders, auctions, payments and delivery.');
   const session = supabase ? (await supabase.auth.getSession()).data.session : null;
-  const response = await fetch(API + path, {
+  const response = await staleWhileRevalidateFetch(API + path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
