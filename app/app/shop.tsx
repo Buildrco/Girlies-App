@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -10,13 +10,13 @@ import { MAIN_CATEGORIES } from '../constants/categories';
 import { getCategoryDefinitions } from '../lib/social';
 const LOCAL_CATEGORY_LABELS: Record<string, string> = { property: 'PROPERTIES' };
 
-const LOCAL_CATEGORY_IMAGES: Record<string, string> = {
-  shop: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-shop.png',
-  services: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-services.png',
-  events: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-events.png',
-  'jobs-careers': 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-jobs.png',
-  property: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-property.png',
-  vehicles: 'https://raw.githubusercontent.com/Buildrco/Girlies-App/main/app/assets/category-vehicles.png',
+const LOCAL_CATEGORY_IMAGES: Record<string, ImageSourcePropType> = {
+  shop: require('../assets/category-shop.png'),
+  services: require('../assets/category-services.png'),
+  events: require('../assets/category-events.png'),
+  'jobs-careers': require('../assets/category-jobs.png'),
+  property: require('../assets/category-property.png'),
+  vehicles: require('../assets/category-vehicles.png'),
 };
 
 const applyLocalCategoryImages = (rows: typeof MAIN_CATEGORIES) => rows.map(category => ({ ...category, label: LOCAL_CATEGORY_LABELS[category.slug] || category.label, image: LOCAL_CATEGORY_IMAGES[category.slug] || category.image }));
@@ -45,7 +45,7 @@ export default function Shop() {
       <View style={s.grid}>
         <View style={s.column}>
           {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
-            <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
+            <Image source={typeof category.image === 'string' ? { uri: category.image } : category.image} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.slug === 'jobs-careers' ? <>JOBS{'\n'}&amp; CAREERS</> : category.label}</Text>
           </MotionPressable>)}
         </View>
