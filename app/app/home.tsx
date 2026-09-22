@@ -70,6 +70,8 @@ const imgs = [
 const heroGirlImage = require('../assets/hero-girl.png');
 const askGirlsImage = require('../assets/ask-girls.png');
 const guideImage = require('../assets/girlie-guide.png');
+const studyBannerImage = require('../assets/banner-study.png');
+const skincareBannerImage = require('../assets/banner-skincare.png');
 
 export default function Home() {
   const router = useRouter();
@@ -200,9 +202,9 @@ export default function Home() {
   }
   const bannerWidth = Math.max(280, width - 36);
   const banners = [
-    { image: heroGirlImage, imageFit: 'contain' as const, title: 'Your next look is waiting.', subtitle: 'Discover women-led shops, real recommendations and new drops.', tag: 'NEW SEASON', color: C.rose },
-    { image: imgs[1], imageFit: 'cover' as const, title: 'Fresh beauty, fresh energy.', subtitle: 'Find the little upgrades that make your everyday feel better.', tag: 'BEAUTY EDIT', color: C.sun },
-    { image: imgs[2], imageFit: 'cover' as const, title: 'Made for your main-character era.', subtitle: 'Shop pieces picked for the life you actually live.', tag: 'THE GIRLIE DROP', color: C.lilac },
+    { image: heroGirlImage, imageFit: 'contain' as const, title: 'Find your next look.', subtitle: 'Shop women-led brands and fresh drops.', tag: 'NEW SEASON', color: C.rose },
+    { image: studyBannerImage, imageFit: 'cover' as const, overlay: true, textColor: '#FFF', title: 'Make time for you.', subtitle: 'Little rituals. Big glow.', tag: 'BEAUTY EDIT', color: C.plum },
+    { image: skincareBannerImage, imageFit: 'cover' as const, overlay: true, textColor: '#FFF', title: 'Your glow, your way.', subtitle: 'Simple care for every day.', tag: 'THE GIRLIE DROP', color: C.rose },
   ];
 
   return <SafeAreaView style={s.safe}>
