@@ -203,7 +203,7 @@ export default function Home() {
   const bannerWidth = Math.max(280, width - 36);
   const banners = [
     { image: heroGirlImage, imageFit: 'contain' as const, title: 'Find your next look.', subtitle: 'Fresh looks and new\ndrops.', tag: 'NEW SEASON', color: C.rose },
-    { image: studyBannerImage, imageFit: 'contain' as const, overlay: true, copyAlign: 'center' as const, tag: '', textColor: '#FFF', title: 'Make time for you.', subtitle: 'Little rituals. Big glow.', tag: 'BEAUTY EDIT', color: C.plum },
+    { image: studyBannerImage, imageFit: 'contain' as const, overlay: true, copyAlign: 'center' as const, tag: '', textColor: '#FFF', title: 'Make time for you.', subtitle: 'Little rituals. Big glow.', color: C.plum },
     { image: skincareBannerImage, imageFit: 'contain' as const, overlay: true, hideCopy: true, textColor: '#FFF', title: 'Your glow, your way.', subtitle: 'Simple care for every day.', tag: 'THE GIRLIE DROP', color: C.rose },
   ];
 
