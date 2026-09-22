@@ -45,7 +45,7 @@ export default function Shop() {
         <View style={s.column}>
           {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
             <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
-            <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
+            <Text style={categoryTitleStyle(category.slug)}>{category.slug === 'jobs-careers' ? <>JOBS{'\n'}&amp; CAREERS</> : category.label}</Text>
           </Pressable>)}
         </View>
         <View style={s.column}>
@@ -78,17 +78,17 @@ const s = StyleSheet.create({
   cardMini: { height: 92 },
   cardHorizontal: { height: 112 },
   cardImage: { position: 'absolute', right: -14, bottom: -4, width: '108%', height: '105%', borderRadius: 18, zIndex: 0 },
-  cardImageShop: { right: -40, bottom: -24, width: '138%', height: '145%' },
+  cardImageShop: { right: -20, bottom: -8, width: '126%', height: '118%' },
   cardImageServices: { right: -48, bottom: -22, width: '134%', height: '140%' },
   cardImageEvents: { right: -42, bottom: -26, width: '136%', height: '142%' },
   cardImageJobs: { right: -34, bottom: -20, width: '132%', height: '138%' },
   cardImageProperty: { right: -46, bottom: -26, width: '140%', height: '145%' },
-  cardImageVehicles: { right: -52, bottom: -30, width: '146%', height: '150%' },
+  cardImageVehicles: { right: -26, bottom: -10, width: '132%', height: '122%' },
   cardTitle: { position: 'absolute', left: 14, top: 14, color: C.ink, fontSize: 12, lineHeight: 15, fontWeight: '900', maxWidth: '64%', zIndex: 2 },
-  cardTitleEvents: { left: '35%', maxWidth: '52%', textAlign: 'center' },
+  cardTitleEvents: { left: '35%', top: 9, maxWidth: '52%', textAlign: 'center' },
   cardTitleServices: { maxWidth: '42%', fontSize: 11.5 },
-  cardTitleJobs: { maxWidth: '74%', fontSize: 11.5, lineHeight: 14 },
-  cardTitleProperty: { maxWidth: '60%' },
+  cardTitleJobs: { maxWidth: '30%', top: 11, fontSize: 11.5, lineHeight: 14 },
+  cardTitleProperty: { maxWidth: '60%', top: 9 },
   cardSpacer: { flex: 1 },
   footer: { marginTop: 18, padding: 20, borderRadius: 25, backgroundColor: C.ink },
   footerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900' },
