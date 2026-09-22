@@ -8,6 +8,9 @@ import { Avatar, VerifiedMark } from '../Avatar';
 import { CurvedBanner } from '../components/CurvedBanner';
 import { ProductCard } from '../components/ProductCard';
 import { SectionTitle } from '../components/SectionTitle';
+import { MotionPressable } from '../components/MotionPressable';
+
+const Pressable = MotionPressable;
 import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
