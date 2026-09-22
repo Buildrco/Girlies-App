@@ -57,7 +57,7 @@ const s = StyleSheet.create({
   seeAllText: { fontSize: 12, fontWeight: '900', color: C.plum },
   grid: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   column: { width: '48.5%', gap: 10 },
-  card: { width: '100%', borderRadius: 22, overflow: 'hidden', padding: 10, justifyContent: 'space-between' },
+  card: { width: '100%', borderRadius: 34, overflow: 'hidden', padding: 10, justifyContent: 'space-between' },
   cardVertical: { height: 168 },
   cardMini: { height: 92 },
   cardHorizontal: { height: 112 },
