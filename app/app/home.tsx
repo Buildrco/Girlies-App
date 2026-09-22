@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Animated, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -8,15 +8,16 @@ import { Avatar, VerifiedMark } from '../Avatar';
 import { CurvedBanner } from '../components/CurvedBanner';
 import { ProductCard } from '../components/ProductCard';
 import { SectionTitle } from '../components/SectionTitle';
-import { MotionPressable } from '../components/MotionPressable';
-
-const Pressable = MotionPressable;
 import { useChromeVisibility } from '../components/BottomNav';
 import { LikeButton } from '../components/LikeButton';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { getCurrentProfile, getPostLikeState, getProducts, getSessionUser, setFollow, setPostLike, type ProductRecord, type ProfileRecord } from '../lib/social';
 import { readOffline, writeOffline } from '../lib/offlineCache';
+import { MotionPressable } from '../components/MotionPressable';
+
+const Pressable = MotionPressable;
+
 
 type HomePost = {
   id: string;
