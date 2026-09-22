@@ -10,6 +10,8 @@ import { ProductCard } from '../../../components/ProductCard';
 import { getCategory, MAIN_CATEGORIES, MARKETPLACE_CATEGORIES } from '../../../constants/categories';
 import { getProducts, getPublishedEvents, getServices, getStore, type ProductRecord, type SellerEvent, type ServiceRecord } from '../../../lib/social';
 import { useCart } from '../../../lib/cart';
+import { MotionPressable } from '../../../components/MotionPressable';
+import { readOffline, writeOffline } from '../../../lib/offlineCache';
 
 const sortOptions = [['best_match', 'Recommended'], ['newest', 'Recently added'], ['price_low', 'Price: Low to High'], ['price_high', 'Price: High to Low']] as const;
 type SelectionKind = 'sort' | 'buying' | 'condition' | 'category' | 'price' | 'delivery';
@@ -23,6 +25,7 @@ const EVENT_ART = [
 function eventImage(event: SellerEvent, index: number) { return event.banner_url || EVENT_ART[index % EVENT_ART.length]; }
 function eventDate(value: string) { return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
 function eventDateTime(value: string) { return new Date(value).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
+const EVENT_CACHE_KEY = 'published-events-v1';
 const SUBCATEGORY_IMAGES: Record<string, string> = {
   Wigs: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=500&q=85',
   Bundles: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=500&q=85',
@@ -137,13 +140,22 @@ export default function CategoryScreen() {
   useEffect(() => {
     let active = true;
     (async () => {
+      if (isEvents) {
+        const cachedEvents = await readOffline<SellerEvent[]>(EVENT_CACHE_KEY);
+        if (!active) return;
+        if (cachedEvents) { setEvents(cachedEvents); setError(''); setLoading(false); }
+        try {
+          const eventRows = await getPublishedEvents();
+          if (active) { setEvents(eventRows); setError(''); void writeOffline(EVENT_CACHE_KEY, eventRows); }
+        } catch (e: any) {
+          if (active && !cachedEvents) setError(e?.message || 'Could not load events.');
+        } finally {
+          if (active) setLoading(false);
+        }
+        return;
+      }
       try {
         setLoading(true);
-        if (isEvents) {
-          const eventRows = await getPublishedEvents();
-          if (active) { setEvents(eventRows); setError(''); }
-          return;
-        }
         if (isServices) {
           const serviceRows = await getServices();
           if (active) { setServices(serviceRows); setProducts([]); setStore(null); setError(''); }
@@ -300,7 +312,18 @@ export default function CategoryScreen() {
   </SafeAreaView>;
 }
 
+function EventGlassOverlay({ event, compact = false }: { event: SellerEvent; compact?: boolean }) {
+  const paid = Number(event.ticket_price || 0) > 0;
+  return <BlurView intensity={70} tint="light" style={compact ? s.upcomingGlass : s.featuredGlass}>
+    <View style={compact ? s.upcomingGlassTop : s.featuredDateRow}><Text style={compact ? s.upcomingDate : s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={compact ? s.upcomingPrice : s.featuredPrice}>{paid ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View>
+    <Text style={compact ? s.upcomingName : s.featuredName} numberOfLines={2}>{event.name}</Text>
+    <Text style={compact ? s.upcomingMeta : s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online in Girlies'} · {eventDateTime(event.starts_at)}</Text>
+    {!compact && <View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View>}
+  </BlurView>;
+}
+
 function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent[]; loading: boolean; error: string }) {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const [eventFilter, setEventFilter] = useState('All events');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -344,14 +367,14 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
          <Animated.View style={[s.eventsSearch, { width: searchProgress.interpolate({ inputRange: [0, 1], outputRange: [48, width - 36] }), paddingHorizontal: searchOpen ? 15 : 1 }]}><Pressable onPress={toggleSearch} style={s.eventsSearchTrigger}><I name="search" size={19} color={C.muted} /></Pressable>{searchOpen && <TextInput autoFocus value={searchQuery} onChangeText={setSearchQuery} placeholder="Search events" placeholderTextColor={C.muted} style={s.eventsSearchInput} returnKeyType="search" />}{searchOpen && <Pressable onPress={() => setEventFilter('All events')} style={s.eventsSearchFilter}><I name="filter" size={18} color={C.muted} /></Pressable>}</Animated.View>
        </LinearGradient></Animated.View>
       <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Upcoming Events</Text><Text style={s.eventsViewAll}>View all</Text></View>
-      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><View style={s.upcomingArrow}><I name="forward" size={16} color="#FFF" /></View><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}</Animated.View>
+      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <MotionPressable key={event.id} style={s.upcomingCard} contentStyle={s.eventCardContent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><LinearGradient colors={['transparent', '#17131818', '#17131888']} style={s.eventImageShade} /><EventGlassOverlay event={event} compact /><BlurView intensity={60} tint="dark" style={s.upcomingArrow}><I name="forward" size={16} color="#FFF" /></BlurView></MotionPressable>)}</ScrollView>}</Animated.View>
        <Animated.View style={{ opacity: enterOpacity, transform: [{ translateX: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Browse event filters</Text></View>
       <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={{ width }} onMomentumScrollEnd={event => { const page = Math.round(event.nativeEvent.contentOffset.x / width); setEventFilter(filterPages[page]?.label || 'All events'); }}>
         {filterPages.map((page, index) => <Pressable key={page.label} onPress={() => setEventFilter(page.label)} style={[s.eventsFilterPage, { width }]}><View style={[s.eventsFilterPanel, eventFilter === page.label && s.eventsFilterPanelOn]}><View><Text style={s.eventsFilterK}>{index + 1} / {filterPages.length}</Text><Text style={s.eventsFilterTitle}>{page.label}</Text><Text style={s.eventsFilterCopy}>{page.copy}</Text></View><View style={s.eventsFilterOptions}>{page.options.map(option => <View key={option} style={s.eventsFilterOption}><Text style={s.eventsFilterOptionText}>{option}</Text></View>)}</View></View></Pressable>)}
       </ScrollView>
       <View style={s.eventsPagerDots}>{filterPages.map(page => <View key={page.label} style={[s.eventsPagerDot, eventFilter === page.label && s.eventsPagerDotOn]} />)}</View></Animated.View>
        <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: listEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>{eventFilter}</Text><Text style={s.eventsViewAll}>{visibleEvents.length} events</Text></View>
-      <View style={s.featuredStack}>{visibleEvents.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} resizeMode="cover" /><View style={s.featuredArrowCircle}><I name="forward" size={17} color="#FFF" /></View><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View></Animated.View>
+      <View style={s.featuredStack}>{visibleEvents.map((event, index) => <MotionPressable key={event.id} style={s.featuredEvent} contentStyle={s.eventCardContent} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} resizeMode="cover" /><LinearGradient colors={['transparent', '#17131820', '#171318A8']} style={s.eventImageShade} /><EventGlassOverlay event={event} /><BlurView intensity={65} tint="dark" style={s.featuredArrowCircle}><I name="forward" size={17} color="#FFF" /></BlurView></MotionPressable>)}</View></Animated.View>
     </ScrollView>
 
   </SafeAreaView>;
@@ -394,10 +417,14 @@ const s = StyleSheet.create({
   eventsSectionTitle: { fontSize: 19, fontWeight: '900' },
   eventsViewAll: { color: C.pink, fontSize: 11, fontWeight: '900' },
   eventsRail: { gap: 12, paddingHorizontal: 18 },
-  upcomingCard: { width: 174, borderRadius: 22, backgroundColor: '#FFF', overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
-  upcomingImage: { width: '100%', height: 92 },
-  upcomingArrow: { position: 'absolute', right: 10, top: 52, width: 34, height: 34, borderRadius: 17, backgroundColor: '#171318CC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
-  upcomingCopy: { padding: 10 },
+  upcomingCard: { width: 174, height: 188, borderRadius: 22, backgroundColor: C.plum, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
+  eventCardContent: { flex: 1 },
+  upcomingImage: { ...StyleSheet.absoluteFillObject },
+  eventImageShade: { ...StyleSheet.absoluteFillObject },
+  upcomingArrow: { position: 'absolute', right: 10, bottom: 12, width: 34, height: 34, borderRadius: 17, overflow: 'hidden', backgroundColor: '#17131866', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
+  upcomingGlass: { position: 'absolute', left: 8, right: 8, bottom: 8, minHeight: 82, borderRadius: 17, overflow: 'hidden', padding: 10, backgroundColor: '#FFFFFF55', borderWidth: 1, borderColor: '#FFFFFF88' },
+  upcomingGlassTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  upcomingPrice: { color: C.pink, fontSize: 10, fontWeight: '900' },
   upcomingDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
   upcomingName: { fontSize: 13, lineHeight: 16, fontWeight: '900', marginTop: 4 },
   upcomingMeta: { color: C.muted, fontSize: 9, marginTop: 5 },
@@ -407,10 +434,10 @@ const s = StyleSheet.create({
   eventsPillText: { fontSize: 10, fontWeight: '900', color: C.muted },
   eventsPillTextOn: { color: '#FFF' },
   featuredStack: { gap: 14, paddingHorizontal: 18, paddingTop: 15 },
-  featuredEvent: { backgroundColor: '#FFF', borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
-  featuredImage: { width: '100%', height: 172 },
-  featuredArrowCircle: { position: 'absolute', right: 14, top: 14, width: 38, height: 38, borderRadius: 19, backgroundColor: '#171318CC', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
-  featuredCopy: { padding: 14 },
+  featuredEvent: { height: 312, backgroundColor: C.plum, borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFFFF66' },
+  featuredImage: { ...StyleSheet.absoluteFillObject },
+  featuredGlass: { position: 'absolute', left: 10, right: 10, bottom: 10, minHeight: 126, borderRadius: 22, overflow: 'hidden', padding: 14, backgroundColor: '#FFFFFF55', borderWidth: 1, borderColor: '#FFFFFF88' },
+  featuredArrowCircle: { position: 'absolute', right: 14, bottom: 18, width: 42, height: 42, borderRadius: 21, overflow: 'hidden', backgroundColor: '#17131866', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF88' },
   featuredDateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   featuredDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
   featuredPrice: { color: C.pink, fontSize: 13, fontWeight: '900' },
