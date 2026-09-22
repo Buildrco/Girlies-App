@@ -4,7 +4,6 @@ import { Platform, UIManager } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { BottomNav, ChromeVisibilityProvider, useChromeVisibility } from '../components/BottomNav';
-import { ScreenEntrance } from '../components/MotionPressable';
 import { CartProvider } from '../lib/cart';
 
 if (Platform.OS === 'android') {
@@ -19,24 +18,22 @@ function NavigationChrome() {
 }
 
 export default function Layout() {
-  const pathname = usePathname();
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <StatusBar style="dark" />
     <ChromeVisibilityProvider>
       <CartProvider>
-        <ScreenEntrance resetKey={pathname} style={{ flex: 1 }}>
-          <Stack
-            screenOptions={{
+        <Stack
+          screenOptions={{
             headerShown: false,
-            freezeOnBlur: true,
+            freezeOnBlur: false,
+            animation: 'slide_from_right',
           }}
         >
-            <Stack.Screen name="home" options={{ animation: 'none' }} />
+          <Stack.Screen name="home" options={{ animation: 'none' }} />
           <Stack.Screen name="shop" options={{ animation: 'none' }} />
           <Stack.Screen name="community" options={{ animation: 'none' }} />
           <Stack.Screen name="profile" options={{ animation: 'none' }} />
-          </Stack>
-        </ScreenEntrance>
+        </Stack>
         <NavigationChrome />
       </CartProvider>
     </ChromeVisibilityProvider>
