@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/theme';
@@ -26,8 +26,9 @@ export default function Shop() {
       <View style={s.top}><Text style={s.k}>EXPLORE GIRLIES</Text><Text style={s.h}>Find your next move.</Text></View>
       <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><Pressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></Pressable></View>
       <View style={s.grid}>
-        {categories.map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 2 || index === 5 ? s.cardWide : index === 3 || index === 4 ? s.cardHalfTall : s.cardHalf, { backgroundColor: category.color }]}>
-          <View style={s.cardIcon}><I name={category.icon} size={index === 2 || index === 5 ? 38 : 32} color={C.ink} filled /></View>
+        {categories.map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index % 4 === 0 || index % 4 === 3 ? s.cardTall : s.cardShort, { backgroundColor: category.color }]}>
+          <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="cover" />
+          <View style={s.cardShade} />
           <Text style={s.cardTitle}>{category.label}</Text>
         </Pressable>)}
       </View>
@@ -48,12 +49,12 @@ const s = StyleSheet.create({
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingBottom: 2 },
   seeAllText: { fontSize: 12, fontWeight: '900', color: C.plum },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
-  card: { borderRadius: 28, overflow: 'hidden', position: 'relative', padding: 16, justifyContent: 'space-between' },
-  cardHalf: { width: '48.5%', height: 168 },
-  cardHalfTall: { width: '48.5%', height: 205 },
-  cardWide: { width: '100%', height: 150 },
-  cardIcon: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#FFFFFFAA', alignItems: 'center', justifyContent: 'center' },
-  cardTitle: { fontSize: 22, lineHeight: 25, fontWeight: '900', maxWidth: '92%' },
+  card: { width: '48.5%', borderRadius: 28, overflow: 'hidden', position: 'relative', padding: 16, justifyContent: 'flex-end' },
+  cardTall: { height: 224 },
+  cardShort: { height: 168 },
+  cardImage: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+  cardShade: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#00000038' },
+  cardTitle: { color: '#FFF', fontSize: 21, lineHeight: 24, fontWeight: '900', maxWidth: '92%' },
   footer: { marginTop: 18, padding: 20, borderRadius: 25, backgroundColor: C.ink },
   footerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900' },
   footerText: { color: '#FFFFFFB8', fontSize: 12, lineHeight: 17, marginTop: 5 },
