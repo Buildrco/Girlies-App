@@ -1,17 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { C } from '../../../constants/theme';
 import { I } from '../../../components/Icons';
 import { ProductCard } from '../../../components/ProductCard';
 import { getCategory, MAIN_CATEGORIES, MARKETPLACE_CATEGORIES } from '../../../constants/categories';
-import { getProducts, getServices, getStore, type ProductRecord, type ServiceRecord } from '../../../lib/social';
+import { getProducts, getPublishedEvents, getServices, getStore, purchaseSellerEventTicket, type ProductRecord, type SellerEvent, type ServiceRecord } from '../../../lib/social';
 import { useCart } from '../../../lib/cart';
 
 const sortOptions = [['best_match', 'Recommended'], ['newest', 'Recently added'], ['price_low', 'Price: Low to High'], ['price_high', 'Price: High to Low']] as const;
 type SelectionKind = 'sort' | 'buying' | 'condition' | 'category' | 'price' | 'delivery';
 const SERVICE_CATEGORY = getCategory('services');
+const EVENT_ART = [
+  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1000&q=85',
+  'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1000&q=85',
+  'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1000&q=85',
+  'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1000&q=85',
+];
+function eventImage(event: SellerEvent, index: number) { return event.banner_url || EVENT_ART[index % EVENT_ART.length]; }
+function eventDate(value: string) { return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+function eventDateTime(value: string) { return new Date(value).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
 const SUBCATEGORY_IMAGES: Record<string, string> = {
   Wigs: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=500&q=85',
   Bundles: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?auto=format&fit=crop&w=500&q=85',
@@ -83,11 +93,13 @@ export default function CategoryScreen() {
   const { slug, store: storeParam } = useLocalSearchParams<{ slug?: string; store?: string }>();
   const slugValue = Array.isArray(slug) ? slug[0] : slug || '';
   const isServices = slugValue === 'services';
+  const isEvents = slugValue === 'events';
   const isMainCategory = MAIN_CATEGORIES.some(item => item.slug === slugValue && item.slug !== 'shop');
   const category = isServices ? SERVICE_CATEGORY : getCategory(slugValue);
   const storeSlug = Array.isArray(storeParam) ? storeParam[0] : storeParam;
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [events, setEvents] = useState<SellerEvent[]>([]);
   const [store, setStore] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -126,6 +138,11 @@ export default function CategoryScreen() {
     (async () => {
       try {
         setLoading(true);
+        if (isEvents) {
+          const eventRows = await getPublishedEvents();
+          if (active) { setEvents(eventRows); setError(''); }
+          return;
+        }
         if (isServices) {
           const serviceRows = await getServices();
           if (active) { setServices(serviceRows); setProducts([]); setStore(null); setError(''); }
@@ -141,7 +158,7 @@ export default function CategoryScreen() {
       }
     })();
     return () => { active = false; };
-  }, [category.label, isServices, storeSlug, minPrice, maxPrice, sort]);
+  }, [category.label, isEvents, isServices, storeSlug, minPrice, maxPrice, sort]);
 
   const routeToCategory = (nextSlug: string) => nextSlug === 'shop'
     ? router.replace('/shop/marketplace')
@@ -219,6 +236,8 @@ export default function CategoryScreen() {
     closeSelection();
   }
 
+  if (isEvents) return <EventsDiscoveryScreen events={events} loading={loading} error={error} />;
+
   return <SafeAreaView style={s.safe}>
     <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
        <View style={s.top}><Pressable onPress={() => router.back()} style={s.back}><I name="back" size={27} /></Pressable><View style={s.topCopy}><Text style={s.k}>{store ? store.name.toUpperCase() : isMainCategory ? 'GIRLIES' : 'MARKETPLACE'}</Text><Text style={s.h}>{category.label}</Text></View><Pressable style={s.cartCircle} onPress={() => router.push('/cart')}><I name="cart" size={19} color="#FFF" filled />{count > 0 && <View style={s.count}><Text style={s.countText}>{count > 99 ? '99+' : count}</Text></View>}</Pressable></View>
@@ -280,12 +299,100 @@ export default function CategoryScreen() {
   </SafeAreaView>;
 }
 
+function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent[]; loading: boolean; error: string }) {
+  const router = useRouter();
+  const { count } = useCart();
+  const [selected, setSelected] = useState<SellerEvent | null>(null);
+  const [buying, setBuying] = useState(false);
+  const featured = events.slice(0, 4);
+  const buy = async (event: SellerEvent) => {
+    if (buying) return;
+    setBuying(true);
+    try {
+      await purchaseSellerEventTicket(event.id);
+      Alert.alert('Ticket reserved', 'Your ticket is ready in your Girlies account.');
+      setSelected(null);
+    } catch (e: any) {
+      Alert.alert('Could not reserve ticket', e?.message || 'Please sign in and try again.');
+    } finally { setBuying(false); }
+  };
+  return <SafeAreaView style={s.eventsSafe}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.eventsScroll}>
+      <LinearGradient colors={['#D7A8EF', '#E9B5D9', '#F4D0DE']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.eventsHero}>
+        <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><View style={s.eventsHeroActions}><Pressable style={s.eventsIcon}><I name="bell" size={19} color={C.ink} /></Pressable><Pressable style={s.eventsCart} onPress={() => router.push('/cart')}><I name="cart" size={18} color="#FFF" filled />{count > 0 && <View style={s.eventsCount}><Text style={s.eventsCountText}>{count > 9 ? '9+' : count}</Text></View>}</Pressable></View></View>
+        <View style={s.eventsSearch}><I name="search" size={19} color={C.muted} /><Text style={s.eventsSearchText}>Search events</Text><I name="filter" size={18} color={C.muted} /></View>
+      </LinearGradient>
+      <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Upcoming Events</Text><Text style={s.eventsViewAll}>View all</Text></View>
+      {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{events.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => setSelected(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} /><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}
+      <View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Top Picks 🔥</Text><Text style={s.eventsViewAll}>View all</Text></View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsPills}>{['All', 'Concert', 'Community', 'Workshops', 'Beauty'].map((item, index) => <Pressable key={item} style={[s.eventsPill, index === 0 && s.eventsPillOn]}><Text style={[s.eventsPillText, index === 0 && s.eventsPillTextOn]}>{item}</Text></Pressable>)}</ScrollView>
+      <View style={s.featuredStack}>{featured.map((event, index) => <Pressable key={event.id} style={s.featuredEvent} onPress={() => setSelected(event)}><Image source={{ uri: eventImage(event, index + 1) }} style={s.featuredImage} /><View style={s.featuredCopy}><View style={s.featuredDateRow}><Text style={s.featuredDate}>{eventDate(event.starts_at)}</Text><Text style={s.featuredPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View><Text style={s.featuredName} numberOfLines={2}>{event.name}</Text><Text style={s.featuredMeta} numberOfLines={2}>{event.event_mode === 'physical' ? event.location || 'Physical event' : 'Online event'} · {eventDateTime(event.starts_at)}</Text><View style={s.featuredBottom}><Text style={s.featuredHost}>Girlies community</Text><Text style={s.featuredArrow}>View details  ›</Text></View></View></Pressable>)}</View>
+    </ScrollView>
+    <Modal visible={Boolean(selected)} transparent animationType="slide" onRequestClose={() => setSelected(null)}><View style={s.eventModalBackdrop}><Pressable style={StyleSheet.absoluteFill} onPress={() => setSelected(null)} /><View style={s.eventDetail}>{selected && <><Image source={{ uri: eventImage(selected, 0) }} style={s.eventDetailImage} /><View style={s.eventDetailCopy}><View style={s.eventDetailHeader}><Text style={s.eventDetailK}>EVENT DETAILS</Text><Pressable onPress={() => setSelected(null)}><Text style={s.close}>×</Text></Pressable></View><Text style={s.eventDetailTitle}>{selected.name}</Text><Text style={s.eventDetailMeta}>{selected.event_mode === 'physical' ? selected.location || 'Physical location' : 'Online in Girlies'} · {eventDateTime(selected.starts_at)}</Text><Text style={s.eventDetailDescription}>{selected.description || 'Planning an event can be a daunting task, especially when you have a lot to manage.'}</Text><Pressable style={s.buyTicket} onPress={() => void buy(selected)}><Text style={s.buyTicketText}>{buying ? 'Reserving…' : Number(selected.ticket_price || 0) > 0 ? 'Buy ticket · GH₵ ' + Number(selected.ticket_price).toFixed(0) : 'Get free ticket'}</Text></Pressable></View></>}</View></View></Modal>
+  </SafeAreaView>;
+}
+
 function FilterRow({ label, value, onPress }: { label: string; value: string; onPress?: () => void }) {
   const content = <><Text style={s.filterRowLabel}>{label}</Text><View style={s.filterRowValue}><Text style={s.filterRowText}>{value}</Text>{onPress && <I name="forward" size={19} />}</View></>;
   return onPress ? <Pressable style={s.filterRow} onPress={onPress}>{content}</Pressable> : <View style={s.filterRow}>{content}</View>;
 }
 
 const s = StyleSheet.create({
+  eventsSafe: { flex: 1, backgroundColor: '#F7F2FA' },
+  eventsScroll: { paddingBottom: 110 },
+  eventsHero: { minHeight: 190, padding: 18, paddingTop: 18, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },
+  eventsHeroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eventsEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, color: '#6F4D78' },
+  eventsLocation: { fontSize: 21, fontWeight: '900', marginTop: 4 },
+  eventsHeroActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  eventsIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFFAA', alignItems: 'center', justifyContent: 'center' },
+  eventsCart: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.ink, alignItems: 'center', justifyContent: 'center' },
+  eventsCount: { position: 'absolute', right: -3, top: -3, width: 16, height: 16, borderRadius: 8, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' },
+  eventsCountText: { color: '#FFF', fontSize: 8, fontWeight: '900' },
+  eventsSearch: { height: 48, borderRadius: 24, backgroundColor: '#FFFFFFE8', flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 15, marginTop: 30 },
+  eventsSearchText: { flex: 1, color: C.muted, fontSize: 12, fontWeight: '700' },
+  eventsHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, marginTop: 22, marginBottom: 11 },
+  eventsSectionTitle: { fontSize: 19, fontWeight: '900' },
+  eventsViewAll: { color: C.pink, fontSize: 11, fontWeight: '900' },
+  eventsRail: { gap: 12, paddingHorizontal: 18 },
+  upcomingCard: { width: 174, borderRadius: 22, backgroundColor: '#FFF', overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
+  upcomingImage: { width: '100%', height: 104 },
+  upcomingCopy: { padding: 10 },
+  upcomingDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
+  upcomingName: { fontSize: 13, lineHeight: 16, fontWeight: '900', marginTop: 4 },
+  upcomingMeta: { color: C.muted, fontSize: 9, marginTop: 5 },
+  eventsPills: { gap: 8, paddingHorizontal: 18 },
+  eventsPill: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 18, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EADFEF' },
+  eventsPillOn: { backgroundColor: C.ink, borderColor: C.ink },
+  eventsPillText: { fontSize: 10, fontWeight: '900', color: C.muted },
+  eventsPillTextOn: { color: '#FFF' },
+  featuredStack: { gap: 14, paddingHorizontal: 18, paddingTop: 15 },
+  featuredEvent: { backgroundColor: '#FFF', borderRadius: 25, overflow: 'hidden', borderWidth: 1, borderColor: '#EADFEF' },
+  featuredImage: { width: '100%', height: 172 },
+  featuredCopy: { padding: 14 },
+  featuredDateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  featuredDate: { color: C.pink, fontSize: 10, fontWeight: '900' },
+  featuredPrice: { color: C.pink, fontSize: 13, fontWeight: '900' },
+  featuredName: { fontSize: 20, lineHeight: 23, fontWeight: '900', marginTop: 6 },
+  featuredMeta: { color: C.muted, fontSize: 10, lineHeight: 15, marginTop: 6 },
+  featuredBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  featuredHost: { color: C.muted, fontSize: 10, fontWeight: '700' },
+  featuredArrow: { color: C.pink, fontSize: 10, fontWeight: '900' },
+  eventsLoading: { padding: 34, alignItems: 'center' },
+  eventsEmpty: { marginHorizontal: 18, padding: 24, borderRadius: 22, backgroundColor: '#FFF', alignItems: 'center' },
+  eventsEmptyTitle: { fontSize: 16, fontWeight: '900' },
+  eventsEmptyText: { color: C.muted, fontSize: 11, textAlign: 'center', marginTop: 6 },
+  eventModalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#1B102866' },
+  eventDetail: { backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
+  eventDetailImage: { width: '100%', height: 210 },
+  eventDetailCopy: { padding: 18, paddingBottom: 28 },
+  eventDetailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eventDetailK: { color: C.pink, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  eventDetailTitle: { fontSize: 24, lineHeight: 28, fontWeight: '900', marginTop: 8 },
+  eventDetailMeta: { color: C.muted, fontSize: 11, marginTop: 8 },
+  eventDetailDescription: { fontSize: 12, lineHeight: 18, marginTop: 14, color: '#4D424A' },
+  buyTicket: { backgroundColor: C.pink, borderRadius: 24, paddingVertical: 14, alignItems: 'center', marginTop: 18 },
+  buyTicketText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
   safe: { flex: 1, backgroundColor: C.bg },
   scroll: { padding: 18, paddingBottom: 45 },
   top: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10 },
