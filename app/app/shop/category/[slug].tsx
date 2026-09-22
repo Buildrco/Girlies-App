@@ -330,19 +330,19 @@ function EventsDiscoveryScreen({ events, loading, error }: { events: SellerEvent
     const needle = eventFilter.toLowerCase().replace(/s$/, '');
     return searchedEvents.filter(event => [event.name, event.description, event.location || ''].join(' ').toLowerCase().includes(needle));
   })();
-    const needle = eventFilter.toLowerCase().replace('s', '');
-    const matches = events.filter(event => (event.name + ' ' + event.description).toLowerCase().includes(needle));
-    return matches.length ? matches : events;
-  })();
   const openEvent = (event: SellerEvent) => router.push({ pathname: '/shop/category/event-detail', params: { id: event.id } });
+  const toggleSearch = () => {
+    const next = !searchOpen;
+    setSearchOpen(next);
+    Animated.timing(searchProgress, { toValue: next ? 1 : 0, duration: 360, useNativeDriver: false }).start();
+    if (!next) setSearchQuery('');
+  };
   return <SafeAreaView style={s.eventsSafe}>
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.eventsScroll}>
       <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: heroEnter }] }}><LinearGradient colors={[C.rose, C.lilac, C.mint]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.eventsHero}>
          <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><Pressable style={s.eventsIcon}><I name="bell" size={20} color={C.ink} /></Pressable></View>
          <Animated.View style={[s.eventsSearch, { width: searchProgress.interpolate({ inputRange: [0, 1], outputRange: [48, width - 36] }), paddingHorizontal: searchOpen ? 15 : 1 }]}><Pressable onPress={toggleSearch} style={s.eventsSearchTrigger}><I name="search" size={19} color={C.muted} /></Pressable>{searchOpen && <TextInput autoFocus value={searchQuery} onChangeText={setSearchQuery} placeholder="Search events" placeholderTextColor={C.muted} style={s.eventsSearchInput} returnKeyType="search" />}{searchOpen && <Pressable onPress={() => setEventFilter('All events')} style={s.eventsSearchFilter}><I name="filter" size={18} color={C.muted} /></Pressable>}</Animated.View>
        </LinearGradient></Animated.View>
-        <View style={s.eventsHeroTop}><View><Text style={s.eventsEyebrow}>EVENTS NEAR YOU</Text><Text style={s.eventsLocation}>Accra, Ghana</Text></View><Pressable style={s.eventsIcon}><I name="bell" size={20} color={C.ink} /></Pressable></View>
-      </LinearGradient>
       <Animated.View style={{ opacity: enterOpacity, transform: [{ translateY: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Upcoming Events</Text><Text style={s.eventsViewAll}>View all</Text></View>
       {loading ? <View style={s.eventsLoading}><ActivityIndicator color={C.pink} /></View> : error ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>Events are taking a moment</Text><Text style={s.eventsEmptyText}>{error}</Text></View> : events.length === 0 ? <View style={s.eventsEmpty}><Text style={s.eventsEmptyTitle}>No upcoming events yet</Text><Text style={s.eventsEmptyText}>New events from the community will appear here.</Text></View> : <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.eventsRail}>{visibleEvents.slice(0, 6).map((event, index) => <Pressable key={event.id} style={s.upcomingCard} onPress={() => openEvent(event)}><Image source={{ uri: eventImage(event, index) }} style={s.upcomingImage} resizeMode="cover" /><View style={s.upcomingArrow}><I name="forward" size={16} color="#FFF" /></View><View style={s.upcomingCopy}><Text style={s.upcomingDate}>{eventDate(event.starts_at)}</Text><Text style={s.upcomingName} numberOfLines={2}>{event.name}</Text><Text style={s.upcomingMeta} numberOfLines={1}>{event.location || 'Online in Girlies'}</Text></View></Pressable>)}</ScrollView>}</Animated.View>
        <Animated.View style={{ opacity: enterOpacity, transform: [{ translateX: filterEnter }] }}><View style={s.eventsHeadingRow}><Text style={s.eventsSectionTitle}>Browse event filters</Text>
