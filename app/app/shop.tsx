@@ -26,13 +26,18 @@ export default function Shop() {
       <View style={s.top}><Text style={s.k}>EXPLORE GIRLIES</Text><Text style={s.h}>Find your next move.</Text></View>
       <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><Pressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></Pressable></View>
       <View style={s.grid}>
-        {Array.from({ length: Math.ceil(categories.length / 2) }, (_, rowIndex) => categories.slice(rowIndex * 2, rowIndex * 2 + 2)).map((row, rowIndex) => <View key={rowIndex} style={s.gridRow}>
-          {row.map((category, columnIndex) => { const index = rowIndex * 2 + columnIndex; return <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index % 4 === 0 || index % 4 === 3 ? s.cardTall : s.cardShort, { backgroundColor: category.color }]}>
+        <View style={s.column}>
+          {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
             <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="contain" />
             <Text style={s.cardTitle}>{category.label}</Text>
-          </Pressable>; })}
-          {row.length === 1 && <View style={s.cardSpacer} />}
-        </View>)}
+          </Pressable>)}
+        </View>
+        <View style={s.column}>
+          {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
+            <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="contain" />
+            <Text style={s.cardTitle}>{category.label}</Text>
+          </Pressable>)}
+        </View>
       </View>
       <View style={s.footer}><Text style={s.footerTitle}>Buy, book, join and find your people.</Text><Text style={s.footerText}>Everything you need, arranged around real life.</Text></View>
     </ScrollView>
@@ -50,11 +55,12 @@ const s = StyleSheet.create({
   heading: { fontSize: 21, fontWeight: '900', marginTop: 4 },
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingBottom: 2 },
   seeAllText: { fontSize: 12, fontWeight: '900', color: C.plum },
-  grid: { gap: 10 },
-  gridRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  card: { flex: 1, minWidth: 0, borderRadius: 28, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
-  cardTall: { height: 224 },
-  cardShort: { height: 168 },
+  grid: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  column: { width: '48.5%', gap: 10 },
+  card: { width: '100%', borderRadius: 22, overflow: 'hidden', padding: 10, justifyContent: 'space-between' },
+  cardVertical: { height: 168 },
+  cardMini: { height: 92 },
+  cardHorizontal: { height: 112 },
   cardImage: { width: '100%', height: '68%', borderRadius: 18 },
   cardTitle: { color: C.ink, fontSize: 19, lineHeight: 22, fontWeight: '900', maxWidth: '92%' },
   cardSpacer: { flex: 1 },
