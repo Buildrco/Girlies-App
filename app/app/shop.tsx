@@ -27,8 +27,7 @@ export default function Shop() {
       <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><Pressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></Pressable></View>
       <View style={s.grid}>
         {categories.map((category, index) => <Pressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index % 4 === 0 || index % 4 === 3 ? s.cardTall : s.cardShort, { backgroundColor: category.color }]}>
-          <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="cover" />
-          <View style={s.cardShade} />
+          <Image source={{ uri: category.image }} style={s.cardImage} resizeMode="contain" />
           <Text style={s.cardTitle}>{category.label}</Text>
         </Pressable>)}
       </View>
@@ -49,12 +48,11 @@ const s = StyleSheet.create({
   seeAll: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingBottom: 2 },
   seeAllText: { fontSize: 12, fontWeight: '900', color: C.plum },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
-  card: { width: '48.5%', borderRadius: 28, overflow: 'hidden', position: 'relative', padding: 16, justifyContent: 'flex-end' },
+  card: { width: '48.5%', borderRadius: 28, overflow: 'hidden', padding: 12, justifyContent: 'space-between' },
   cardTall: { height: 224 },
   cardShort: { height: 168 },
-  cardImage: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-  cardShade: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#00000038' },
-  cardTitle: { color: '#FFF', fontSize: 21, lineHeight: 24, fontWeight: '900', maxWidth: '92%' },
+  cardImage: { width: '100%', height: '68%', borderRadius: 18 },
+  cardTitle: { color: C.ink, fontSize: 19, lineHeight: 22, fontWeight: '900', maxWidth: '92%' },
   footer: { marginTop: 18, padding: 20, borderRadius: 25, backgroundColor: C.ink },
   footerTitle: { color: '#FFF', fontSize: 18, fontWeight: '900' },
   footerText: { color: '#FFFFFFB8', fontSize: 12, lineHeight: 17, marginTop: 5 },
