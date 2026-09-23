@@ -51,7 +51,7 @@ export default function Shop() {
         </View>
         <View style={s.column}>
           {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
-            <Image source={{ uri: category.image }} style={categoryImageStyle(category.slug)} resizeMode="contain" />
+            <Image source={typeof category.image === 'string' ? { uri: category.image } : category.image} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
           </MotionPressable>)}
         </View>
