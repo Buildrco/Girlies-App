@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { BlurView } from '@sbaiahmed1/react-native-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -71,7 +71,7 @@ export default function EventDetailScreen() {
         <View style={s.bannerWrap}>
           <Image source={{ uri: eventImage(event) }} style={s.banner} resizeMode="cover" />
           <LinearGradient colors={['transparent', '#171318CC']} style={s.bannerShade} />
-          <BlurView intensity={65} tint="light" style={s.glassCard}>
+          <BlurView blurType="regular" blurAmount={20} blurRounds={5} style={s.glassCard}>
             <View style={s.glassTop}><Text style={s.glassDate}>{eventDate(event.starts_at)}</Text><Text style={s.glassPrice}>{Number(event.ticket_price || 0) > 0 ? 'GH₵ ' + Number(event.ticket_price).toFixed(0) : 'Free'}</Text></View>
             <Text style={s.glassTitle} numberOfLines={2}>{event.name}</Text>
             <Text style={s.glassMeta}>{event.event_mode === 'physical' ? event.location || 'Physical location' : 'Online in Girlies'} · {eventDateTime(event.starts_at)}</Text>
@@ -101,7 +101,7 @@ const s = StyleSheet.create({
   bannerWrap: { marginHorizontal: 16, marginTop: 16, height: 354, borderRadius: 30, overflow: 'hidden', position: 'relative', backgroundColor: C.plum },
   banner: { ...StyleSheet.absoluteFillObject },
   bannerShade: { ...StyleSheet.absoluteFillObject },
-  glassCard: { position: 'absolute', left: 14, right: 14, bottom: 14, minHeight: 126, borderRadius: 25, overflow: 'hidden', padding: 16, backgroundColor: '#FFFFFF66', borderWidth: 1, borderColor: '#FFFFFFAA' },
+  glassCard: { position: 'absolute', left: 14, right: 14, bottom: 14, minHeight: 126, borderRadius: 25, overflow: 'hidden', padding: 16, borderWidth: 1, borderColor: '#FFFFFFAA' },
   glassTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   glassDate: { color: C.pink, fontSize: 11, fontWeight: '900' },
   glassPrice: { color: C.pink, fontSize: 16, fontWeight: '900' },
