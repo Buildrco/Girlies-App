@@ -44,13 +44,13 @@ export default function Shop() {
       <View style={s.sectionIntro}><View><Text style={s.eyebrow}>BROWSE THE COMMUNITY</Text><Text style={s.heading}>Start with a category</Text></View><MotionPressable style={s.seeAll} onPress={() => router.push('/shop/marketplace')}><Text style={s.seeAllText}>See all</Text><I name="forward" size={17} color={C.plum} /></MotionPressable></View>
       <View style={s.grid}>
         <View style={s.column}>
-          {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
+          {[categories[0], categories[1], categories[2]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} contentStyle={s.cardContent} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardVertical : index === 1 ? s.cardMini : s.cardHorizontal, { backgroundColor: category.color }]}>
             <Image source={typeof category.image === 'string' ? { uri: category.image } : category.image} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.slug === 'jobs-careers' ? <>JOBS{'\n'}&amp; CAREERS</> : category.label}</Text>
           </MotionPressable>)}
         </View>
         <View style={s.column}>
-          {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
+          {[categories[3], categories[4], categories[5]].filter(Boolean).map((category, index) => <MotionPressable key={category.slug} contentStyle={s.cardContent} onPress={() => openCategory(category.slug)} style={[s.card, index === 0 ? s.cardHorizontal : index === 1 ? s.cardMini : s.cardVertical, { backgroundColor: category.color }]}>
             <Image source={typeof category.image === 'string' ? { uri: category.image } : category.image} style={categoryImageStyle(category.slug)} resizeMode="contain" />
             <Text style={categoryTitleStyle(category.slug)}>{category.label}</Text>
           </MotionPressable>)}
@@ -75,6 +75,7 @@ const s = StyleSheet.create({
   grid: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
   column: { width: '48.5%', gap: 10 },
   card: { width: '100%', borderRadius: 34, overflow: 'hidden', padding: 10, justifyContent: 'flex-start', position: 'relative' },
+  cardContent: { flex: 1 },
   cardVertical: { height: 168 },
   cardMini: { height: 92 },
   cardHorizontal: { height: 112 },
